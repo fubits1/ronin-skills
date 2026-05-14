@@ -36,8 +36,8 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 git fetch --quiet origin main
-LOCAL="$(git rev-parse @)"
-REMOTE="$(git rev-parse '@{u}')"
+LOCAL="$(git rev-parse HEAD)"
+REMOTE="$(git rev-parse origin/main)"
 [[ "$LOCAL" == "$REMOTE" ]] || die "local main differs from origin/main"
 
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
@@ -50,10 +50,9 @@ jq --arg v "$VERSION" \
   .claude-plugin/marketplace.json > "$tmp"
 mv "$tmp" .claude-plugin/marketplace.json
 
-echo "release.sh: validating marketplace"
-claude plugin validate . || die "marketplace validation failed"
-
 echo "release.sh: validating plugins"
+# Skip root `claude plugin validate .` — v2.1.119 rejects $schema/description
+# at marketplace.json root even though the loader accepts them (see validate.yml).
 for d in plugins/*/; do
   claude plugin validate "$d" || die "validation failed for $d"
 done

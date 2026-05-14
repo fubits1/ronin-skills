@@ -14,7 +14,7 @@ Before every Bash call, ask: "Am I reading or searching file contents? Am I runn
 
 Every `Bash(grep ...)`, `Bash(cat ...)`, `Bash(find ...)` forces the user to click "Allow" in the IDE. Dedicated tools are auto-allowed — zero clicks. This is not a style preference. It directly wastes the user's time.
 
-The `agent` plugin ships a hook (`agent/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping; the hook is the enforcement.
+The `agent` plugin ships a hook (`plugins/agent/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping; the hook is the enforcement.
 
 ## Tool Preference Order
 
