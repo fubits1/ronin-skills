@@ -10,4 +10,4 @@ user-invocable: true
 - `pnpm exec` or `pnpx` to run project tools, not `npx`.
 - `socket npm/<pkg>` to check score BEFORE installing. Then install with `pnpm add`.
 - **Always use official migration/upgrade tools when they exist** (e.g. `pnpx @astrojs/upgrade`, `pnpx svelte-migrate`, `pnpx @next/codemod`). Never manually edit version numbers in package.json when a migration CLI is available.
-- **Test script layout:** `pnpm test` runs vitest + e2e concurrently (via `concurrently`). `pnpm test:unit` runs vitest only. `pnpm test:e2e` runs Playwright e2e only. `pnpm validate` runs vitest (not e2e) + lint + typecheck + svelte-check.
+- **Test script layout varies by project — read `package.json` scripts first.** Example (JS/TS conventions used here): `pnpm test` runs vitest + e2e concurrently (via `concurrently`). `pnpm test:unit` runs vitest only. `pnpm test:e2e` runs Playwright e2e only. `pnpm validate` runs vitest (not e2e) + lint (eslint + oxlint) + typecheck + `knip` + `stylelint` (and `svelte-check` for Svelte projects). Other frameworks (Python, Rust, Go) won't use these exact tools — substitute your stack's equivalents.

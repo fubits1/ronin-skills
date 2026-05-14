@@ -4,6 +4,8 @@ description: When reporting test/build results, NEVER dismiss failures as "not m
 user-invocable: true
 ---
 
+# Asshole
+
 You just dismissed pre-existing failures instead of offering to fix them. That's unhelpful.
 
 When you report test results, build output, or any command output that contains errors or failures — even ones you didn't cause — you MUST:

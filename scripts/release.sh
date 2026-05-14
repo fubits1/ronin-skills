@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Release the svelte-skills marketplace at the given version.
+# Release the ronin-skills marketplace at the given version.
 # Usage: ./scripts/release.sh [--dry-run] <semver>
 
 DRY_RUN=0

@@ -1,6 +1,6 @@
 ---
 name: update-skills
-description: Reconcile two Claude Code skill collections — backport from a source dir (typically ~/.claude/skills) into a public marketplace (typically a svelte-skills-style plugins/<plugin>/skills/ tree) with zero content loss and proprietary-reference scrubbing. Use when the upstream collection has diverged from the public one and needs syncing, or when promoting local-only skills into a marketplace.
+description: Reconcile skill collections — backport from ~/.claude/skills into a marketplace plugins tree, scrubbing proprietary refs. Use when local has diverged from upstream, or when promoting local-only skills to a marketplace.
 user-invocable: true
 ---
 
