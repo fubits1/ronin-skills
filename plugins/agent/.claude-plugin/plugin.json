@@ -1,0 +1,4 @@
+{
+  "name": "agent",
+  "description": "AI coding agent discipline — research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules, plus 4 enforcement hooks."
+}
