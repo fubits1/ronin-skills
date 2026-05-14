@@ -6,7 +6,7 @@ user-invocable: true
 
 # Plan
 
-- **HARD RULE: call `EnterPlanMode` as your FIRST tool call.** No `Read`, `Grep`, `Glob`, `Bash`, `Edit`, or `Write` before it. The `bonus` plugin's `force-plan-mode.sh` UserPromptSubmit hook injects this directive on `/plan`, "plan this", "make a plan", etc. — it is non-negotiable.
+- **HARD RULE: call `EnterPlanMode` as your FIRST tool call.** No `Read`, `Grep`, `Glob`, `Bash`, `Edit`, or `Write` before it. The `agent` plugin's `force-plan-mode.sh` UserPromptSubmit hook injects this directive on `/plan`, "plan this", "make a plan", etc. — it is non-negotiable.
 - When the user says "plan", "plan this", "make a plan", or any variant — ENTER PLAN MODE. Write the plan in the plan file. NOT in chat. NOT in a table. NOT in a code block.
 - Plans in chat are worthless. The plan file is the only place plans belong.
 - NEVER skip plan mode because "it's simple enough". If the user said plan, they mean plan.

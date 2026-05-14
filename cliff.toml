@@ -1,0 +1,46 @@
+# git-cliff config — generates GitHub Release notes from Conventional Commits.
+# Preview locally: git-cliff --unreleased
+# Docs: https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% if version %}## {{ version }}{% else %}## Unreleased{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | split(pat=" -->") | last | trim }}
+{% for commit in commits %}\
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | split(pat="\n") | first | trim }}{% if commit.breaking %} ⚠ BREAKING{% endif %}
+{% endfor %}{% endfor %}
+**Full Changelog**: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/compare/{{ previous.version }}...{{ version }}
+"""
+trim = false
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+require_conventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+topo_order = false
+sort_commits = "newest"
+
+# Group order is controlled via "<!-- N -->" HTML-comment prefixes.
+# Cliff sorts groups alphabetically; the comments are invisible in rendered markdown.
+commit_parsers = [
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^Merge ", skip = true },
+  { message = "^feat",     group = "<!-- 0 -->Features" },
+  { message = "^fix",      group = "<!-- 1 -->Fixes" },
+  { message = "^perf",     group = "<!-- 2 -->Performance" },
+  { message = "^refactor", group = "<!-- 3 -->Refactor" },
+  { message = "^docs",     group = "<!-- 4 -->Docs" },
+  { message = "^test",     group = "<!-- 5 -->Tests" },
+  { message = "^build",    group = "<!-- 6 -->Build" },
+  { message = "^ci",       group = "<!-- 7 -->CI" },
+  { message = "^chore",    group = "<!-- 8 -->Chores" },
+]
+
+[remote.github]
+owner = "fubits1"
+repo = "ronin-skills"

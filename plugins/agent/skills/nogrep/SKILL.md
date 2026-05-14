@@ -14,7 +14,7 @@ Before every Bash call, ask: "Am I reading or searching file contents? Am I runn
 
 Every `Bash(grep ...)`, `Bash(cat ...)`, `Bash(find ...)` forces the user to click "Allow" in the IDE. Dedicated tools are auto-allowed — zero clicks. This is not a style preference. It directly wastes the user's time.
 
-The `bonus` plugin ships a hook (`bonus/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping; the hook is the enforcement.
+The `agent` plugin ships a hook (`agent/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping; the hook is the enforcement.
 
 ## Tool Preference Order
 
@@ -111,11 +111,11 @@ Do NOT switch to these when the obvious Bash form is blocked. Switch to the dedi
 | Node shell-out | `node -e "<Node subprocess API>('grep …')"` | Hook hard-blocks `node -e` invoking subprocess APIs |
 | Python shell-out | `python3 -c "<subprocess module call>"` | Hook hard-blocks `python -c` invoking `subprocess` |
 
-If you find a new bypass vector the hook misses, harden `plugins/bonus/hooks/nogrep.sh` — do NOT silently use the bypass to do the work. The whole point of this skill + hook pair is that bypasses are bugs to fix, not loopholes to exploit.
+If you find a new bypass vector the hook misses, harden `plugins/agent/hooks/nogrep.sh` — do NOT silently use the bypass to do the work. The whole point of this skill + hook pair is that bypasses are bugs to fix, not loopholes to exploit.
 
 ## git Commands
 
-**NEVER use Bash for mutating git commands.** They are NOT auto-allowed and prompt the user every time. The `bonus` plugin's `nogrep.sh` hook also blocks them. Instead:
+**NEVER use Bash for mutating git commands.** They are NOT auto-allowed and prompt the user every time. The `agent` plugin's `nogrep.sh` hook also blocks them. Instead:
 
 - For remote state (PRs, branches, CI): use `gh` (auto-allowed)
 - For local git operations: use `!` prefix — suggest the user run `! git fetch`, `! git log`, etc. The output lands in the conversation.

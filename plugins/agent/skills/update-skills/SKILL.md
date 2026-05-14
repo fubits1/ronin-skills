@@ -17,7 +17,7 @@ Reconcile two Claude Code skill collections — backport from a source dir (typi
 ## Inputs
 
 - **Source dir** — usually `~/.claude/skills/<skill>/` (one dir per skill, may include `references/`, `scripts/`, sibling docs). Skip symlinked skills — they come from other repos and are out of scope.
-- **Target marketplace** — usually `<repo>/plugins/<plugin>/skills/<skill>/`. Plugin split typically: `agent` (cross-cutting agent discipline), `frontend` (web/CSS/tests), `svelte-5` (Svelte components), `svelte-5-migration`, `bonus` (hooks + meta-skills).
+- **Target marketplace** — usually `<repo>/plugins/<plugin>/skills/<skill>/`. Plugin split by domain (e.g. `agent` for cross-cutting agent discipline; `frontend` for web/CSS/tests; `svelte-5` for Svelte components). Hooks typically live inside the plugin whose skills they enforce (e.g. `agent/hooks/nogrep.sh` paired with the `agent:nogrep` skill).
 - **Generalization patterns** — what to strip: project names, internal URLs, absolute home paths, dated personal incidents.
 
 ## Hard rules
@@ -27,7 +27,7 @@ Reconcile two Claude Code skill collections — backport from a source dir (typi
 - **Reference style.** Use the marketplace's `plugin:skill` namespacing (e.g. `frontend:editing`, `agent:before-you-act`). NEVER bare `/skill` paths. NEVER `<root-prefix>:<plugin>:<skill>` doubled.
 - **Strip dated personal incidents.** Replace `On 2026-04-08 ...` with anonymous `A common failure shape: ...` framing. Keep the lesson, drop the date.
 - **Strip proprietary references.** Project names, internal repos, absolute home paths (`/Users/<name>/...`), internal dashboards / URLs (Grafana, Linear, private Slack). When in doubt: anonymize to a generic placeholder.
-- **`bonus` is special.** It often holds the enforcement layer (hooks) for a skill that lives elsewhere (e.g. `bonus/hooks/nogrep.sh` paired with `agent:nogrep` skill). Check hooks before promoting a skill that overlaps.
+- **Skills + hooks pair together.** When a skill has an enforcement hook (e.g. `agent:nogrep` ↔ `agent/hooks/nogrep.sh`), check the hook before promoting or moving the skill. Both should stay in the same plugin so the enforcement contract isn't split across marketplaces.
 
 ## Workflow
 
@@ -70,8 +70,8 @@ For each source-only skill, **ask the user one at a time** before writing.
 
 Per skill:
 
-1. **Check for redundancy first.** Grep the marketplace for skills covering the same ground (e.g. a renamed `discipline` skill in `bonus` may already cover a local `communication` skill — verify line-by-line, don't just claim "redundant"). If redundant, SKIP with a clear justification.
-2. **Pick the plugin.** Match the skill's domain — cross-cutting → `agent`, Svelte-specific → `svelte-5`, etc. Cross-reference with hooks (skill paired with an enforcement hook in `bonus` should usually live in `agent` and reference the hook).
+1. **Check for redundancy first.** Grep the marketplace for skills covering the same ground (e.g. a renamed `discipline` skill in one plugin may already cover a local `communication` skill — verify line-by-line, don't just claim "redundant"). If redundant, SKIP with a clear justification.
+2. **Pick the plugin.** Match the skill's domain — cross-cutting → `agent`, Svelte-specific → `svelte-5`, etc. If the skill has a paired enforcement hook, both should land in the same plugin.
 3. **Generalize content.** Strip dated incidents, project names, absolute paths. Replace bare `/skill` references with `plugin:skill`.
 4. **Ask before write.** Present the *proposed* content (or just the generalization diff if it's small) and wait for approval.
 5. **Frontmatter name field** must match the directory name. If source has `name: skills` but the dir is `skills-reference`, fix it on write.

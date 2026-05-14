@@ -45,7 +45,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/fix-formatting.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/fix-formatting.sh",
+            "timeout": 30
           }
         ]
       }
