@@ -70,7 +70,7 @@ A `SessionStart` hook also injects a mandatory directive to invoke the `discipli
 
 Claude Code's plugin namespaces are **global** — `agent:research` resolves to whichever installed plugin is named `agent`, regardless of which marketplace provided it. This marketplace ships the canonical `agent` plugin.
 
-If you also install [fubits1/svelte-skills](https://github.com/fubits1/svelte-skills), its frontend skills reference `agent:research`, `agent:done`, etc. — those references resolve against `agent@ronin-skills` installed here. No additional configuration needed.
+If you also install [fubits1/svelte-skills](https://github.com/fubits1/svelte-skills), its `frontend:*` and `svelte-5:*` skills reference `agent:research`, `agent:done`, `agent:before-you-act`, etc. — those references resolve against `agent@ronin-skills` installed here. No additional configuration needed.
 
 If you don't install svelte-skills, the `agent` plugin still works fully — every cross-reference in its skills is either intra-plugin (e.g. `agent:plan` references `agent:research`) or uses generic wording (e.g. "your project's validate skill") with no hard dependency on other marketplaces.
 
