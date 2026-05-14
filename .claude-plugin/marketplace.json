@@ -1,0 +1,34 @@
+{
+  "$schema": "https://cdn.claude.ai/plugins/marketplace.schema.json",
+  "name": "ronin-skills",
+  "description": "Claude Code plugin marketplace for framework-agnostic AI coding agent discipline — research, planning, self-checks, completion verification, git/CI/dev-server/pnpm/socket/nogrep/obey discipline, and bash-tool enforcement hooks.",
+  "owner": {
+    "name": "fubits1",
+    "email": "contact@fubits.dev"
+  },
+  "plugins": [
+    {
+      "name": "agent",
+      "source": "./plugins/agent",
+      "description": "AI coding agent discipline — research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules, plus 4 enforcement hooks (nogrep, plan-mode, no-absolute-paths, auto-formatter). Requires superpowers plugin.",
+      "version": "0.1.0",
+      "author": {
+        "name": "fubits1"
+      },
+      "category": "workflow",
+      "keywords": [
+        "agent",
+        "discipline",
+        "research",
+        "planning",
+        "verification",
+        "ci",
+        "git",
+        "hooks",
+        "nogrep"
+      ],
+      "license": "MIT"
+    }
+  ],
+  "version": "0.1.0"
+}
