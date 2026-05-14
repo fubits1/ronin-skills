@@ -75,7 +75,12 @@ fi
 
 echo "release.sh: committing + tagging"
 git add .claude-plugin/marketplace.json
-git commit -m "chore(release): $TAG"
+# --allow-empty: handles the case where marketplace.json is already at the
+# target version (e.g. initial release scaffolded at the same version). jq's
+# rewrite produces no diff, so the chore commit would be empty — which is fine
+# for tagging an already-correct state. Real bumps still produce a normal
+# (non-empty) commit.
+git commit --allow-empty -m "chore(release): $TAG"
 git tag -a "$TAG" -m "$TAG"
 
 echo "release.sh: pushing"
