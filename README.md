@@ -1,6 +1,6 @@
 # ronin-skills
 
-Claude Code plugin marketplace for framework-agnostic AI coding agent discipline. Standalone — usable in any project (Python, Rust, Go, Svelte, plain JS, …).
+Claude Code plugin marketplace for framework-agnostic AI coding agent discipline. Standalone — usable in mosts projects.
 
 > **Why "ronin"?** The natural name `agent-skills` is reserved by Anthropic for official marketplaces from the `anthropics` GitHub organization. **[Rōnin](https://en.wikipedia.org/wiki/R%C5%8Dnin)** — a masterless samurai of feudal Japan, skilled, code-bound, self-directed — fits the spirit: a disciplined agent that arrives in any project, brings its own skills + ethics, and works without a fixed master.
 >
@@ -11,7 +11,7 @@ Claude Code plugin marketplace for framework-agnostic AI coding agent discipline
 > - fff instead of grep/bash/cat/find/head/tail/awk/wc
 > - jq for JSON parsing/shaping
 > - Socket.dev for supply-chain checks
-> - pnpm (but the skills work with any package manager)
+> - pnpm
 
 ## Plugin
 
@@ -86,7 +86,6 @@ Source: [Claude Code skills docs](https://code.claude.com/docs/en/skills)
 
 - [fubits1/svelte-skills](https://github.com/fubits1/svelte-skills) — frontend + Svelte 5 + Svelte 5 migration plugins. Soft-depends on `agent@ronin-skills`.
 - [spences10/claude-code-toolkit](https://github.com/spences10/claude-code-toolkit) — domain-split alternative (mcp / analytics / workflow / devops / dev-practices / dev-environment / secrets plugins).
-- [stolinski/s-stack](https://github.com/stolinski/s-stack) — flat `SKILL.md` collection (different distribution model).
 - [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — ultra-compressed communication mode for terser agent output.
 
 ## Skill development / Ops
