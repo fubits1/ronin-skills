@@ -40,12 +40,23 @@ Irreversible actions include:
 
 "I'm pretty sure it's safe" is not approval. The user saying "yes, do it" is approval.
 
+Approval has prerequisites:
+
+- Before asking the user to approve an action, list every part of their system the action can affect and the worst realistic outcome. Approval given on an incomplete list does not count as approval.
+- If you present a script or command set as "read-only" or "diagnostic", it must not contain a single command that changes state (no restart, write, delete, install). Every state-changing command needs its own separate, named approval.
+
 ### 3. Did I verify this, or am I about to guess?
 
 Before stating any fact about a tool, flag, API, or library:
 
 - If you verified it (ran it, read the docs, searched) → proceed
 - If you're reaching for a plausible-sounding answer → say "I don't know" or verify first
+
+The same applies to system state:
+
+- A measurement is only valid at the moment it was taken. Before repeating an earlier result as if it is still true, run the command again and quote the new output.
+- When you report a measurement, state which machine and which connection it was taken over, and how you confirmed that — a result from the wrong path proves nothing.
+- If you have not tested a cause, a mechanism, or a number, label it as a hypothesis. Stating it as fact is lying.
 
 See `agent:research` Bullshit Gate section.
 

@@ -20,6 +20,8 @@ user-invocable: true
 - **Plans must contain survival context.** Save test URLs, route paths, IDs, and exact verification steps in the plan file — conversation context doesn't survive resets.
 - **When incorporating a sub-plan, INCLUDE by reference.** Add `**Full detail:** plan-name.md` and keep the sub-plan file intact. NEVER rewrite as a lossy summary. The sub-plan IS the detail.
 - **When told to "update the plan," UPDATE THE PLAN FILE.** Not a chat summary. Not a mental note. Open the plan file and edit it.
+- **Before giving the user a multi-step procedure, compare each step against failures already encountered in the current conversation.** If a step repeats one, stop and redesign.
+- **If new evidence shows an assumption in the approved plan is wrong, STOP.** Update the plan file first; only then continue, referencing the updated plan.
 - **NEVER include commit or push steps in a plan.** Git operations are the user's business, not yours.
 
 ## Problem-Solving Approach
