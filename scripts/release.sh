@@ -42,24 +42,32 @@ REMOTE="$(git rev-parse origin/main)"
 
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
 
-echo "release.sh: bumping marketplace.json to $VERSION"
+echo "release.sh: bumping marketplace.json + plugin manifests to $VERSION"
 tmp="$(mktemp .claude-plugin/marketplace.json.XXXXXX)"
-trap 'git checkout -- .claude-plugin/marketplace.json 2>/dev/null; rm -f "$tmp"' ERR INT TERM
+trap 'git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json 2>/dev/null; rm -f "$tmp"' ERR INT TERM
 jq --arg v "$VERSION" \
   '.version = $v | .plugins |= map(.version = $v)' \
   .claude-plugin/marketplace.json > "$tmp"
 mv "$tmp" .claude-plugin/marketplace.json
 
-echo "release.sh: validating plugins"
-# Skip root `claude plugin validate .` — v2.1.119 rejects $schema/description
-# at marketplace.json root even though the loader accepts them (see validate.yml).
+# keep each plugin's own manifest version in sync with the marketplace, so
+# `claude plugin validate` sees a version and the two never drift apart
+for pj in plugins/*/.claude-plugin/plugin.json; do
+  [[ -f "$pj" ]] || continue
+  pjtmp="$(mktemp "$pj.XXXXXX")"
+  jq --arg v "$VERSION" '.version = $v' "$pj" > "$pjtmp"
+  mv "$pjtmp" "$pj"
+done
+
+echo "release.sh: validating marketplace + plugins"
+claude plugin validate . || die "marketplace validation failed"
 for d in plugins/*/; do
   claude plugin validate "$d" || die "validation failed for $d"
 done
 
 if [[ "$DRY_RUN" == "1" ]]; then
   echo "release.sh: --dry-run, reverting bump"
-  git checkout -- .claude-plugin/marketplace.json
+  git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json
   echo
   if command -v git-cliff >/dev/null; then
     echo "release.sh: release notes preview for $TAG"
@@ -74,7 +82,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 echo "release.sh: committing + tagging"
-git add .claude-plugin/marketplace.json
+git add .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json
 # --allow-empty: handles the case where marketplace.json is already at the
 # target version (e.g. initial release scaffolded at the same version). jq's
 # rewrite produces no diff, so the chore commit would be empty — which is fine

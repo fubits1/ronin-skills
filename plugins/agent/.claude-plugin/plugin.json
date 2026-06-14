@@ -1,4 +1,8 @@
 {
   "name": "agent",
+  "version": "0.1.0",
+  "author": {
+    "name": "fubits1"
+  },
   "description": "AI coding agent discipline — research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules, plus 4 enforcement hooks."
 }
