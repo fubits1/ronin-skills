@@ -44,7 +44,7 @@ git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already e
 
 echo "release.sh: bumping marketplace.json + plugin manifests to $VERSION"
 tmp="$(mktemp .claude-plugin/marketplace.json.XXXXXX)"
-trap 'git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json 2>/dev/null; rm -f "$tmp"' ERR INT TERM
+trap 'git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json 2>/dev/null; rm -f "$tmp"' ERR INT TERM EXIT
 jq --arg v "$VERSION" \
   '.version = $v | .plugins |= map(.version = $v)' \
   .claude-plugin/marketplace.json > "$tmp"

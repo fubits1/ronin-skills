@@ -14,7 +14,7 @@ That's it. The script:
 
 1. Checks preconditions (on `main`, clean tree, in sync with origin, tag doesn't exist, version matches `X.Y.Z`).
 2. Bumps `marketplace.json` top-level `version`, the agent plugin's entry `version`, and each plugin's own `.claude-plugin/plugin.json` `version` to the given value (kept in sync so the two manifests never drift).
-3. Validates the marketplace and each plugin (`claude plugin validate .` and `claude plugin validate plugins/agent`).
+3. Validates the marketplace and each plugin (`claude plugin validate .` and `for d in plugins/*/; do claude plugin validate "$d"; done`).
 4. Commits `chore(release): v$VERSION`.
 5. Tags `v$VERSION`.
 6. Pushes with `git push --follow-tags origin main`.
@@ -46,7 +46,9 @@ If `release.sh` can't run (e.g. Windows without bash):
 # 1. bump `version` in .claude-plugin/marketplace.json (top-level AND the agent plugin's entry) AND in each plugins/*/.claude-plugin/plugin.json
 # 2. validate marketplace + plugin
 claude plugin validate . || exit 1
-claude plugin validate plugins/agent || exit 1
+for d in plugins/*/; do
+  claude plugin validate "$d" || exit 1
+done
 # 3. commit + tag + push
 git commit -am "chore(release): v0.1.0"
 git tag v0.1.0

@@ -85,7 +85,7 @@ There is NO reason to use `Bash(rg -U ...)`.
 Grep(pattern: "pattern", path: "src/", glob: "*.ts", -A: 5, -i: true, output_mode: "content")
 ```
 
-No pipes. No chaining.
+No command chaining (`&&` / `\|\|` / `;`). Pipes only for allowed cases (e.g. into `jq`).
 
 ## No Command Chaining
 

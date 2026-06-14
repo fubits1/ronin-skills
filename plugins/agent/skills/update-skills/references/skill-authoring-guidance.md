@@ -27,7 +27,7 @@ Sources (verify against these, don't trust memory):
   consecutive hyphens; **must match the parent directory name**; no XML tags; no reserved
   words ("anthropic", "claude"). Prefer gerund form (`processing-pdfs`) or a noun phrase
   (`pdf-processing`); avoid `helper`/`utils`/`tools`/`data`.
-- `description`: max **1024 chars**, non-empty, no XML tags. **Write in third person** — "The
+- `description`: max **250 chars**, non-empty, no XML tags. **Write in third person** — "The
   description is injected into the system prompt, and inconsistent point-of-view can cause
   discovery problems." State **what it does AND when to use it**, with specific trigger
   keywords. Good: "Extract text and tables from PDF files… Use when working with PDF files or
