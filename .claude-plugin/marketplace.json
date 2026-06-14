@@ -11,7 +11,7 @@
       "name": "agent",
       "source": "./plugins/agent",
       "description": "AI coding agent discipline — research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules, plus 4 enforcement hooks (nogrep, plan-mode, no-absolute-paths, auto-formatter). Requires superpowers plugin.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "author": {
         "name": "fubits1"
       },
@@ -30,5 +30,5 @@
       "license": "MIT"
     }
   ],
-  "version": "0.2.1"
+  "version": "0.2.2"
 }
