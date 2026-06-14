@@ -1,6 +1,6 @@
 # ronin-skills
 
-Claude Code plugin marketplace for framework-agnostic AI coding agent discipline. Standalone — usable in mosts projects.
+Claude Code plugin marketplace for framework-agnostic AI coding agent discipline. Standalone, usable in most projects.
 
 > **Why "ronin"?** The natural name `agent-skills` is reserved by Anthropic for official marketplaces from the `anthropics` GitHub organization. **[Rōnin](https://en.wikipedia.org/wiki/R%C5%8Dnin)** — a masterless samurai of feudal Japan, skilled, code-bound, self-directed — fits the spirit: a disciplined agent that arrives in any project, brings its own skills + ethics, and works without a fixed master.
 >
@@ -49,6 +49,19 @@ For local development/testing:
 /plugin install agent
 ```
 
+## Updating
+
+To get the latest version:
+
+```
+/plugin marketplace update ronin-skills
+/reload-plugins
+```
+
+This re-fetches the catalog and updates the installed `agent` plugin to the latest release, then `/reload-plugins` applies it without a restart.
+
+To update automatically at startup instead, enable auto-update once: open `/plugin`, go to the **Marketplaces** tab, select `ronin-skills`, and choose **Enable auto-update** (off by default for third-party marketplaces). Claude Code then prompts you to run `/reload-plugins` whenever it pulls a new version.
+
 ## Skill behavior
 
 Skills in this marketplace have auto-invocation triggers defined in their descriptions. Claude Code may invoke them automatically when it detects relevant context (e.g. starting research, declaring a task done, running git commands). You can also invoke any skill manually via `/skill-name` or its fully qualified form `/agent:skill-name`. To disable auto-invocation for a specific skill, add `disable-model-invocation: true` to that skill's SKILL.md frontmatter.
@@ -59,7 +72,7 @@ The `agent` plugin ships 4 enforcement hooks that live next to the skills they e
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash calls to `grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg` and shell-out bypass vectors. Forces use of dedicated tools (fff MCP, built-in Grep / Read / Glob, jq). |
+| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [nogrep.md](plugins/agent/hooks/nogrep.md). |
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |

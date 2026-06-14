@@ -22,8 +22,9 @@ Reconcile two Claude Code skill collections — backport from a source dir (typi
 
 ## Hard rules
 
+- **Conform to the official authoring guidance.** Before authoring or editing ANY skill, read [references/skill-authoring-guidance.md](references/skill-authoring-guidance.md). Structure (prose vs bullets vs **checklist**), description shape, voice, and length are governed by that guidance — which is sourced from Anthropic's official docs — NOT by personal preference. Multi-step procedures are numbered steps or checklists, never flattened into prose; explain a rule's "why" in a clause, not a paragraph; keep MUST/NEVER where evidence shows the rule gets skipped.
 - **Research before edit.** Read BOTH SKILL.md files fully on both sides — and every sibling file (`references/*`, `scripts/*`). Partial reads cause partial backports.
-- **Ask before every Write.** Promotions and large backports go through user review — one skill at a time. Batched Writes feel aggressive when the user wants to evaluate each.
+- **Ask before every Write — one skill at a time.** Promotions and large backports go through user review; present the proposed content (or just the generalization diff if it's small) and wait for approval before writing. Batched Writes feel aggressive when the user wants to evaluate each.
 - **Reference style.** Use the marketplace's `plugin:skill` namespacing (e.g. `frontend:editing`, `agent:before-you-act`). NEVER bare `/skill` paths. NEVER `<root-prefix>:<plugin>:<skill>` doubled.
 - **Strip dated personal incidents.** Replace `On 2026-04-08 ...` with anonymous `A common failure shape: ...` framing. Keep the lesson, drop the date.
 - **Strip proprietary references.** Project names, internal repos, absolute home paths (`/Users/<name>/...`), internal dashboards / URLs (Grafana, Linear, private Slack). When in doubt: anonymize to a generic placeholder.
@@ -36,7 +37,7 @@ Reconcile two Claude Code skill collections — backport from a source dir (typi
 1. List source dir contents; skip symlinks.
 2. List target marketplace skills (per plugin).
 3. Classify each source skill as **overlapping** (exists in both) or **source-only** (candidate for promotion).
-4. Whitelist dex permissions before starting (saves dozens of prompts):
+4. **Tracking — optional.** For large syncs, track with dex (an epic plus one child task per skill); for a one- or two-skill sync, skip the ceremony. When using dex, whitelist its permissions before starting (saves dozens of prompts):
 
    ```json
    "Bash(dex create:*)",
@@ -47,7 +48,7 @@ Reconcile two Claude Code skill collections — backport from a source dir (typi
    "Bash(dex delete:*)"
    ```
 
-5. Create a dex epic; one child task per skill. Each task records: source path, target path, preliminary verdict, generalization items, validation criteria.
+   Each dex task records: source path, target path, preliminary verdict, generalization items, validation criteria.
 
 ### Phase 2 — Per-skill reconcile (overlapping)
 
@@ -66,15 +67,14 @@ Sibling files (`references/*.md`, `scripts/*`) need the same diff. The SKILL.md 
 
 ### Phase 3 — Promotions (source-only)
 
-For each source-only skill, **ask the user one at a time** before writing.
-
-Per skill:
+Per source-only skill:
 
 1. **Check for redundancy first.** Grep the marketplace for skills covering the same ground (e.g. a renamed `discipline` skill in one plugin may already cover a local `communication` skill — verify line-by-line, don't just claim "redundant"). If redundant, SKIP with a clear justification.
 2. **Pick the plugin.** Match the skill's domain — cross-cutting → `agent`, Svelte-specific → `svelte-5`, etc. If the skill has a paired enforcement hook, both should land in the same plugin.
 3. **Generalize content.** Strip dated incidents, project names, absolute paths. Replace bare `/skill` references with `plugin:skill`.
-4. **Ask before write.** Present the *proposed* content (or just the generalization diff if it's small) and wait for approval.
-5. **Frontmatter name field** must match the directory name. If source has `name: skills` but the dir is `skills-reference`, fix it on write.
+4. **Frontmatter name field** must match the directory name. If source has `name: skills` but the dir is `skills-reference`, fix it on write.
+
+Writes follow the ask-first, one-skill-at-a-time rule above.
 
 ### Phase 4 — README updates
 
@@ -95,7 +95,7 @@ After promotions:
 
 - **Cross-reference check.** Any `agent:<skill>` / `frontend:<skill>` / `svelte-5:<skill>` references must point to skills that actually exist after the changes. Common breakage: a backported "see X" line pointing to a skill that was SKIPPED rather than ADDED.
 
-- **Description char count.** Spot-check that no description is wildly over budget. Soft cap 250.
+- **Description char count.** Spot-check that no description is wildly over the budget set in Phase 2.
 
 - **Markdown lint.** Pre-existing warnings (MD041 first-line-h1, MD060 table-column-style) are fine — don't try to fix repo-wide style issues that predate the work. Only fix warnings introduced by the current edits.
 

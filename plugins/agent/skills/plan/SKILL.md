@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Planning, problem-solving approach, and systematic debugging. Auto-invoke when user says "plan", when debugging, fixing issues, or implementing features.
+description: Planning and problem-solving discipline — enter plan mode first, write plans in the plan file (not chat), structured research → validation → implementation. Auto-invoke when the user says "plan", "make a plan", or when fixing issues or implementing features.
 user-invocable: true
 ---
 
@@ -20,6 +20,8 @@ user-invocable: true
 - **Plans must contain survival context.** Save test URLs, route paths, IDs, and exact verification steps in the plan file — conversation context doesn't survive resets.
 - **When incorporating a sub-plan, INCLUDE by reference.** Add `**Full detail:** plan-name.md` and keep the sub-plan file intact. NEVER rewrite as a lossy summary. The sub-plan IS the detail.
 - **When told to "update the plan," UPDATE THE PLAN FILE.** Not a chat summary. Not a mental note. Open the plan file and edit it.
+- **Before giving the user a multi-step procedure, compare each step against failures already encountered in the current conversation.** If a step repeats one, stop and redesign.
+- **If new evidence shows an assumption in the approved plan is wrong, STOP.** Update the plan file first; only then continue, referencing the updated plan.
 - **NEVER include commit or push steps in a plan.** Git operations are the user's business, not yours.
 
 ## Problem-Solving Approach
@@ -28,21 +30,17 @@ user-invocable: true
 - Don't over-engineer. Use framework standard solutions.
 - Follow the approved plan. Don't silently deviate during implementation.
 - Stop chaining fixes on a broken foundation. Reassess the whole approach.
-- Never dismiss errors as "pre-existing" or "out of scope". Acknowledge ALL failures and ask "Want me to look into fixing these too?"
-- NEVER suggest "parking" a bug or "moving on". If there's a visible issue, fix it immediately.
-- **Before editing ANY file, verify the FULL chain of assumptions** (command, port, env vars, all referencing files). All changes in one pass, never iteratively.
+- NEVER park a bug or "move on" past a visible issue, and don't dismiss it as "out of scope" / "for later". Fix it now, or ask "want me to look into this too?" — quietly stepping past a known problem is how it ships unnoticed.
+- Before editing any file, verify the full chain of assumptions (command, port, env vars, all referencing files) and make the changes in one pass, not iteratively — partial assumptions are how a "fix" breaks a second thing.
 - **When splitting a config value from global to per-item**, preserve the original value for items that weren't asked to change.
 - **When changing a wrapper/shared default that affects ALL consumers**, test EVERY consumer pattern — not just one edge case.
 
 ## Systematic Debugging
 
-**REQUIRED:** Also invoke `superpowers:systematic-debugging` for complex bugs.
+For any bug, test failure, or unexpected behavior, invoke `superpowers:systematic-debugging` before proposing a fix — that skill owns the general method (reproduce, read all output, trace the path, one hypothesis at a time, change one thing at a time).
 
-When encountering a bug, test failure, or unexpected behavior — BEFORE proposing any fix:
+A few frontend/test specifics that general method doesn't cover:
 
-1. **STOP repeating.** If the same action failed twice, it will fail a third time. After two identical failures, change your hypothesis.
-2. **Read ALL the output.** Not just the first error. CI logs, test output, console errors — read the FULL output. Multiple root causes are common.
-3. **Trace the FULL code path.** Follow the exact execution path from trigger to failure. Check CHILD component imports too — grep children for the pattern, not just the parent.
-4. **Debug in the REAL environment first.** Mocked tests that pass prove nothing about real-app behavior. Browser first (Playwright), then write tests that match what the browser showed.
-5. **One hypothesis at a time.** Change one thing, verify, then next. Never batch unrelated changes.
-6. **Wrappers swallow errors.** When a wrapper component (CardWrapper, ErrorBoundary, etc.) is between you and the bug, the wrapper is NOT the root cause — it's hiding the real one. Debug in the browser with Playwright, not in vitest output.
+- **Trace into children, not just the parent.** When following a code path, grep the child components for the pattern too — the bug often lives in an import a layer down.
+- **Debug in the real environment first.** Mocked tests that pass prove nothing about real-app behavior. Reproduce in the browser (Playwright) first, then write tests that match what the browser actually showed.
+- **Wrappers swallow errors.** When a wrapper (CardWrapper, ErrorBoundary, etc.) sits between you and the bug, the wrapper is not the root cause — it's hiding it. Debug in the browser with Playwright, not in vitest output.

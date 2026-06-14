@@ -18,9 +18,17 @@ user-invocable: true
 
 ## Mandatory Research Channels
 
-When `/research` is invoked, you MUST hit ALL four
-channels before writing anything. Skipping a channel is
-not research — it's guessing.
+When `/research` is invoked, hit ALL four channels before
+writing anything — skipping a channel is not research,
+it's guessing. (The one carve-out: a single trivial fact —
+does this flag exist, what is the latest version — needs
+only one authoritative source. Everything that is a
+migration, an architectural question, "suggest better
+approaches", or "ARE YOU SURE?" gets the full four-channel
+sweep.) Minimum bar before presenting any non-trivial
+finding: at least one local read/grep AND one
+WebSearch/WebFetch — if you haven't used both, you haven't
+researched, go back and do it.
 
 ### 1. Local investigation
 
@@ -60,22 +68,11 @@ open or already closed. Check if suggested solutions
 actually work in the current version. Don't present the
 first search result as the final answer.
 
-## Evidence Requirement
-
-Before presenting findings, you must have used at minimum:
-
-- At least one **Grep or Read** (local investigation)
-- At least one **WebSearch or WebFetch** (online research)
-
-If you haven't used both, you haven't researched. Go back
-and do it.
-
 ## "THOROUGHLY" = exhaustive first pass
 
-Data-flow / trace request. Cover every hop in one pass.
-Re-prompt for forgotten layer = fail.
-
-Layers to check before writing:
+A data-flow / trace request must cover every hop in one
+pass — getting re-prompted for a forgotten layer is a
+fail. Layers to check before writing:
 
 1. Component tree: child → every parent, every render site
 2. Contexts + global stores: producers, consumers
@@ -90,23 +87,21 @@ Layers to check before writing:
    fetch, subscriptions, websockets, polling, stores
    seeded elsewhere
 
-Mermaid graph includes every layer. N/A → say so.
+Include every layer in the trace (a Mermaid graph helps);
+mark any layer N/A explicitly rather than silently skipping it.
 
-## The "Research From Memory" Anti-Pattern
+## The "Research From Memory" anti-pattern
 
-The failure mode that keeps happening: reading this skill,
-saying "let me research this", then writing an answer from
-existing knowledge without using a single search tool.
+The failure that keeps happening: reading this skill, saying
+"let me research this", then writing an answer from existing
+knowledge without using a single search tool. Classic shape —
+asked to "suggest better approaches", the answer gets written
+from memory and misses that the problem is a known tracked bug
+with a community fix far better than the vibe answer.
 
-A common shape: asked to research a tool problem and
-"suggest better approaches", an answer gets written from
-memory — missing that the problem is a known tracked bug
-with existing community solutions far better than what gets
-produced from vibes.
-
-**If you catch yourself about to write an answer without
-having used WebSearch or WebFetch, STOP. You are doing the
-thing. Go search.**
+If you catch yourself about to write an answer without having
+used WebSearch or WebFetch — STOP. You are doing the thing. Go
+search.
 
 ## Specific Rules
 
@@ -140,8 +135,7 @@ thing. Go search.**
 ## The Bullshit Gate
 
 Before answering ANY factual question about a tool, CLI
-flag, API, library behavior, or compatibility — ask:
-
+flag, API, library behavior, or compatibility, ask:
 **"Did I verify this, or am I about to guess?"**
 
 If the answer is "guess", STOP. Do one of:
@@ -152,12 +146,12 @@ If the answer is "guess", STOP. Do one of:
 
 **Red flags that you're about to bullshit:**
 
-| Thought                          | Reality                               |
-| -------------------------------- | ------------------------------------- |
-| "I'm pretty sure the flag is..." | You're guessing                       |
-| "This should work because..."    | You haven't tested it                 |
-| "The alternative is X"           | Have you verified X works?            |
-| "It's a known bug"               | Do you have a link? Is it still open? |
+| Thought | Reality |
+| --- | --- |
+| "I'm pretty sure the flag is..." | You're guessing |
+| "This should work because..." | You haven't tested it |
+| "The alternative is X" | Have you verified X works? |
+| "It's a known bug" | Do you have a link? Is it still open? |
 
 **Common bullshit patterns to recognize:**
 
