@@ -18,7 +18,7 @@ The reason is not permission clicks: Claude Code runs `grep`/`cat`/`head`/`tail`
 - Built-in tool approvals cache. Unique Bash content, especially `cat > file` heredocs, never caches, so a human re-reviews it on every run (the heaviest pattern in claude-code#19649).
 - The hook fires where the system prompt fails. The model ignores its own "don't use Bash for this" instruction ~40% of sessions, more after context compaction and in subagents. Anthropic closed that as not-planned (claude-code#39979), so enforcement has to live in a hook.
 
-The `agent` plugin ships a hook (`plugins/agent/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping; the hook is the enforcement. Full rationale and sources: `plugins/agent/hooks/nogrep.md`.
+The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plugins/hooks/hooks/nogrep.sh`) that hard-blocks the wrong Bash calls. This skill is the educational mapping and lives in `agent`; the hook is the enforcement and lives in `hooks`. Without the `hooks` plugin installed, this skill still guides; it just isn't enforced. Full rationale and sources: `plugins/hooks/hooks/nogrep.md`.
 
 ## Tool Preference Order
 

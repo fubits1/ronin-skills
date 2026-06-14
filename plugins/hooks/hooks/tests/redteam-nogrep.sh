@@ -1,6 +1,6 @@
 #!/bin/bash
 # Red-team contract suite for nogrep.sh — standalone, NOT wired into CI.
-# Run manually:  bash plugins/agent/hooks/tests/redteam-nogrep.sh
+# Run manually:  bash plugins/hooks/hooks/tests/redteam-nogrep.sh
 #
 # Each assertion encodes the INTENDED design (README "forcing one command per
 # call"; nogrep.md; claude-code#13371/#4956/#28784/#16180/#20085). A divergence
