@@ -36,7 +36,13 @@
         "name": "fubits1"
       },
       "category": "workflow",
-      "keywords": ["hooks", "nogrep", "enforcement", "bash", "pretooluse"],
+      "keywords": [
+        "hooks",
+        "nogrep",
+        "enforcement",
+        "bash",
+        "pretooluse"
+      ],
       "license": "MIT"
     }
   ],
