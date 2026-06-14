@@ -254,7 +254,12 @@ EOF
 # counted as a separator — e.g. `git commit -m "fix: a; b"`, `node -e "x=1; y()"`,
 # `sed 's/;/,/g' f` stay single commands. Best-effort (non-nested quotes), which
 # matches the rest of this regex-only hook.
-CHAIN_STRIPPED=$(printf '%s' "$COMMAND" | sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g")
+# Backslash-escaped chars are removed FIRST so an escaped quote `\"` inside a
+# double-quoted string doesn't mis-pair the quote-stripper and leave an inner
+# `;`/`&&` exposed — e.g. `echo "say \"hi; bye\""`. Removing `\X` only affects
+# the chain count (not the command that runs), and an escaped operator like `\;`
+# is correctly not a separator.
+CHAIN_STRIPPED=$(printf '%s' "$COMMAND" | sed -E 's/\\.//g' | sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g")
 CHAIN_SEGS=$(printf '%s' "$CHAIN_STRIPPED" | sed -E 's/(&&|\|\||;)/\n/g')
 _chain_count=0
 while IFS= read -r _seg; do
