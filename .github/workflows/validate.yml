@@ -31,4 +31,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Run nogrep hook tests
-        run: bash plugins/agent/hooks/tests/run-nogrep-tests.sh
+        run: bash plugins/hooks/hooks/tests/run-nogrep-tests.sh

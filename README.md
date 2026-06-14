@@ -13,13 +13,14 @@ Claude Code plugin marketplace for framework-agnostic AI coding agent discipline
 > - Socket.dev for supply-chain checks
 > - pnpm
 
-## Plugin
+## Plugins
 
-One plugin. Standalone. No dependencies on other marketplaces' plugins.
+Two plugins. The skills (`agent`) and the enforcement hooks (`hooks`) install separately, so enforcement is opt-in.
 
-| Plugin | Skills/Hooks | What it does |
+| Plugin | Contents | What it does |
 | --- | --- | --- |
-| [agent](plugins/agent/) | 15 skills, 4 hooks | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules, plus 4 enforcement hooks (nogrep, plan-mode, no-absolute-paths, auto-formatter). |
+| [agent](plugins/agent/) | 15 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
+| [hooks](plugins/hooks/) | 4 hooks | Optional enforcement: nogrep (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
 
 ## Installation
 
@@ -43,10 +44,18 @@ For local development/testing:
 /plugin install superpowers
 ```
 
-### 3. Install the plugin
+### 3. Install the plugin(s)
+
+The skills:
 
 ```
 /plugin install agent
+```
+
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are **Bash/`jq` scripts — macOS and Linux only, not native Windows** (use WSL or Git Bash with `jq` on `PATH`). Install only if you want enforcement:
+
+```
+/plugin install hooks
 ```
 
 ## Updating
@@ -58,7 +67,7 @@ To get the latest version:
 /reload-plugins
 ```
 
-This re-fetches the catalog and updates the installed `agent` plugin to the latest release, then `/reload-plugins` applies it without a restart.
+This re-fetches the catalog and updates **all installed plugins** from this marketplace (e.g. `agent`, `hooks`) to the latest release. Run `/reload-plugins` afterward to apply changes without a restart.
 
 To update automatically at startup instead, enable auto-update once: open `/plugin`, go to the **Marketplaces** tab, select `ronin-skills`, and choose **Enable auto-update** (off by default for third-party marketplaces). Claude Code then prompts you to run `/reload-plugins` whenever it pulls a new version.
 
@@ -68,16 +77,32 @@ Skills in this marketplace have auto-invocation triggers defined in their descri
 
 ## Hooks
 
-The `agent` plugin ships 4 enforcement hooks that live next to the skills they enforce:
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 4 enforcement hooks that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [nogrep.md](plugins/agent/hooks/nogrep.md). |
+| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [nogrep.md](plugins/hooks/hooks/nogrep.md). |
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
 
 A `SessionStart` hook also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+
+## Migration (0.2.x to 0.3.0)
+
+**Breaking change: the hooks moved out of the `agent` plugin into a new `hooks` plugin.**
+
+Before 0.3.0, installing `agent` also installed the 4 enforcement hooks. As of 0.3.0, `agent` is **skills only** and the hooks ship in a separate, optional `hooks` plugin.
+
+If you had enforcement via `agent`, then after `/plugin marketplace update ronin-skills` the hooks **stop firing** — `nogrep`, `no-absolute-paths`, `force-plan-mode`, the auto-formatter, and the SessionStart `discipline` directive all go silent. To keep enforcement, install the new plugin:
+
+```
+/plugin marketplace update ronin-skills
+/plugin install hooks
+/reload-plugins
+```
+
+If you preferred the hooks NOT firing globally, do nothing: updating `agent` alone now gives you the skills with no global side effects, which is the new default.
 
 ## Namespace and how it relates to other marketplaces
 
