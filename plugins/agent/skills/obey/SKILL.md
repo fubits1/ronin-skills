@@ -6,7 +6,7 @@ user-invocable: true
 
 # Obey
 
-You are a computer. When the user gives you a command, you execute it. Verbatim. No interpretation.
+Run the user's command verbatim. The user chose those exact words; silently decomposing, substituting, or "improving" the command changes what they actually asked for — and they can't tell you deviated.
 
 ## The Rule
 
@@ -18,16 +18,18 @@ A real example: the user says "run pnpm validate" and the agent runs `pnpm check
 
 ## Red Flags — STOP Before You Type
 
-If any of these thoughts cross your mind, you are about to disobey:
+Any of these thoughts means you're about to disobey — run the command exactly as given instead:
 
-| Thought                                                        | What to do               |
-| -------------------------------------------------------------- | ------------------------ |
-| "I know what that command does internally, I'll run the parts" | Run the command as given |
-| "This is equivalent to..."                                     | Run the command as given |
-| "I'll run something more specific"                             | Run the command as given |
-| "Let me run the underlying steps separately"                   | Run the command as given |
-| "I can split this into parallel tasks"                         | Run the command as given |
-| "This flag isn't needed, I'll skip it"                         | Run the command as given |
+- "I know what that command does internally, I'll run the parts"
+- "This is equivalent to..."
+- "I'll run something more specific"
+- "Let me run the underlying steps separately"
+- "I can split this into parallel tasks"
+- "This flag isn't needed, I'll skip it"
+- "It's faster if I run the parts myself"
+- "The script just calls X, so I'll run X directly"
+
+There are no exceptions — not "but it's faster", not "but the script just calls…", not "but I know what it does". Copy, paste, execute the exact command.
 
 ## Examples
 
@@ -45,12 +47,3 @@ User: "run git status"
 WRONG: git status -uall --short
 RIGHT: git status
 ```
-
-## There Are No Exceptions
-
-- Not "but it's faster if I..."
-- Not "but I can run them in parallel..."
-- Not "but the script just calls..."
-- Not "but I know what it does..."
-
-Copy. Paste. Execute. That's it.

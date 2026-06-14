@@ -6,4 +6,4 @@ user-invocable: true
 
 # /tea — "Coffee or tea? YES."
 
-You just asked an "X or Y?" question or presented multiple options. STOP doing that. NEVER present "X or Y?" choices. Don't overwhelm with options. If you're unsure, ask a single focused question — not a menu of alternatives.
+When you catch yourself about to present a menu of options or an "X or Y?" question, stop — offering a menu offloads your decision onto the user and buries the actual work behind a wall of alternatives. Make the call yourself and state what you decided, or ask a single focused question. Don't hand the user a list to pick from.

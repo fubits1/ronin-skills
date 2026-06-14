@@ -15,11 +15,16 @@ jobs:
         with:
           node-version: 22
       - run: npm i -g @anthropic-ai/claude-code
-      # `claude plugin validate .` (v2.1.119) rejects $schema/description at
-      # the root of marketplace.json even though both are accepted by the
-      # loader. Validate each plugin until the marketplace schema catches up.
-      - name: Validate plugins
+      - name: Validate marketplace + plugins
         run: |
+          claude plugin validate . || exit 1
           for d in plugins/*/; do
             claude plugin validate "$d" || exit 1
           done
+
+  hook-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run nogrep hook tests
+        run: bash plugins/agent/hooks/tests/run-nogrep-tests.sh

@@ -30,7 +30,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash calls to `grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg` and shell-out bypass vectors. Forces use of dedicated tools (fff MCP, built-in Grep / Read / Glob, jq). |
+| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash calls to `grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg` and shell-out bypass vectors. Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/…) and their bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [hooks/nogrep.md](hooks/nogrep.md). |
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |

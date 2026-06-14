@@ -25,7 +25,7 @@ Five questions. Answer all five before acting. If any answer is "no" or "I'm not
 
 ### 1. Did the user ask for this?
 
-Not "would this be helpful" — did they **actually ask**. If the action isn't in the user's instruction, don't do it. Do exactly N things, not N-1, not N+1. See `agent:discipline` Scope Discipline section for the full rules.
+Not "would this be helpful" — did they **actually ask**. If the action isn't in the user's instruction, don't do it. (The scope rules — do exactly N, not N±1 — live in `agent:discipline`; this gate just makes you check.)
 
 ### 2. Is this reversible?
 

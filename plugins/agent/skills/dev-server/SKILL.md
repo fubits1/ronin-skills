@@ -6,10 +6,9 @@ user-invocable: true
 
 # Dev Server
 
-- NEVER start `pnpm dev` unless explicitly told to.
-- ALWAYS assume user is running dev server already.
-- NEVER kill user's server.
-- ALWAYS check if AGENTS.md specifies port - if not either ASK or assume defaults (e.g. Vite: 5173)
-- If started, kill background processes IMMEDIATELY after verification — do not defer cleanup.
-- Never blindly kill processes on a port — ASK FIRST. It might be the user's process.
-- After context compaction, assume you know NOTHING about what's currently running.
+- Don't start `pnpm dev` unless explicitly told to — assume the user already runs the dev server, so starting your own collides on the port.
+- Never kill the user's dev server — it's their running process and killing it disrupts their work.
+- Never kill any process on a port without asking first — you can't be sure it's even yours.
+- Check whether AGENTS.md specifies a port so you target the right server; if it doesn't, either ask or assume the defaults (e.g. Vite: 5173).
+- If you did start a background process, kill it immediately after verification rather than deferring cleanup, so it doesn't linger and conflict with the user's processes.
+- After context compaction, assume you know NOTHING about what's currently running — the record of any background process you started may not have survived compaction.
