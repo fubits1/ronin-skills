@@ -82,7 +82,7 @@ Sibling files (`references/*.md`, `scripts/*`) need the same diff. The SKILL.md 
 Per source-only skill:
 
 1. **Check for redundancy first.** Grep the marketplace for skills covering the same ground (e.g. a renamed `discipline` skill in one plugin may already cover a local `communication` skill; verify line-by-line, don't just claim "redundant"). If redundant, SKIP with a clear justification.
-2. **Pick the plugin.** Match the skill's domain: cross-cutting goes to `agent`, Svelte-specific to `svelte-5`, etc. If the skill has a paired enforcement hook, both should land in the same plugin.
+2. **Pick the plugin.** Match the skill's domain: cross-cutting goes to `agent`, Svelte-specific to `svelte-5`, etc. If the skill has a paired enforcement hook, keep the pair in the same marketplace. The hook may live in the dedicated `hooks` plugin when enforcement is packaged separately for optional install.
 3. **Generalize content.** Strip dated incidents, project names, absolute paths. Replace bare `/skill` references with `plugin:skill`.
 4. **Frontmatter name field** must match the directory name. If source has `name: skills` but the dir is `skills-reference`, fix it on write.
 

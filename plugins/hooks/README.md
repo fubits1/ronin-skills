@@ -9,10 +9,10 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 > not just one repo. A bug in a Bash hook affects every project at once. Install only if you
 > want that enforcement everywhere.
 
-> **POSIX shell only — not native Windows.** The hooks are Bash scripts using `sed`/`awk`/`jq`.
-> They run on macOS and Linux. On Windows, use WSL (or a Git Bash / MSYS environment with
-> `jq` on `PATH`); they will not run under native `cmd.exe` or PowerShell. `jq` must be
-> installed (the test harness fails fast without it).
+> **Bash required — not native Windows.** The hooks are Bash scripts using `sed`/`awk`/`jq`.
+> They run on macOS and Linux. On Windows, use WSL or Git Bash / MSYS with `jq` on `PATH`;
+> they will not run under native `cmd.exe` or PowerShell. `jq` must be installed
+> (the test harness fails fast without it).
 
 ## Hooks
 

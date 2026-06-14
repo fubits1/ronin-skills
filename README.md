@@ -67,7 +67,7 @@ To get the latest version:
 /reload-plugins
 ```
 
-This re-fetches the catalog and updates the installed `agent` plugin to the latest release, then `/reload-plugins` applies it without a restart.
+This re-fetches the catalog and updates **all installed plugins** from this marketplace (e.g. `agent`, `hooks`) to the latest release. Run `/reload-plugins` afterward to apply changes without a restart.
 
 To update automatically at startup instead, enable auto-update once: open `/plugin`, go to the **Marketplaces** tab, select `ronin-skills`, and choose **Enable auto-update** (off by default for third-party marketplaces). Claude Code then prompts you to run `/reload-plugins` whenever it pulls a new version.
 
