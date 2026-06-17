@@ -6,19 +6,17 @@ user-invocable: true
 
 # Do Your Job
 
-When the user corrects you, hands you a diagnosis ("it just needs X", "when I do Y it works", "that's wrong, it's Z"), or gives you a directive to decide or act ("decide whether Z", "research and conclude", "update the docs"), that statement is your next action. Carry it out. This skill stops the loop where you keep theorizing, re-asserting, proposing a cleverer alternative, or bouncing the finished verdict back for a nod after the user already pointed you at the answer, forcing them to repeat it.
+A correction, a handed-over diagnosis ("it just needs X", "when I do Y it works", "that's wrong, it's Z"), or a directive to decide or act ("decide whether Z", "research and conclude", "update the docs") is an instruction, not a discussion prompt. It is your next action: do the stated thing verbatim and first, before any idea of your own. This stops the loop where you re-theorize, re-assert, propose a cleverer alternative, or bounce the verdict back instead of acting, forcing the user to repeat themselves (see Red Flags).
 
-## The Rule
-
-A correction, a handed-over diagnosis, or a directive to decide or act is an instruction, not a discussion prompt. Do the stated thing, verbatim and first, before any idea of your own. Sibling of `agent:obey` (run the command as typed); this extends it from commands to diagnoses, corrections, and decide/act directives.
+Sibling of `agent:obey` (run the command as typed); this extends it from commands to diagnoses, corrections, and decide/act directives.
 
 ## When the user hands you a diagnosis
 
 1. Implement exactly what they said, in the simplest form that does it. No embellishment.
 2. Verify it with the metric that defines the problem (positions, not counts; rendered behavior, not a green build). See `agent:done`.
-3. Only if their stated fix provably fails (with evidence) do you propose an alternative, and you say what you tried and why it failed.
+3. Only if their stated fix provably fails (with evidence) do you propose an alternative, saying what you tried and why it failed.
 
-Never skip step 1 to chase your own theory. The user watching the system usually knows the real cause; your job is to apply it, not to out-think it.
+Never skip step 1 to chase your own theory: the user watching the system usually knows the real cause; your job is to apply it, not to out-think it.
 
 ## When your own fix keeps failing
 
@@ -34,8 +32,8 @@ Measure one variable at a time with real instrumentation (log the value, disable
 
 The user corrected you (or told you to decide) because they want it done, not because they want options. Two shapes of the same failure:
 
-- Answering a correction with an `AskUserQuestion` menu or "do you want A or B?" — you have the receipts; make the call and act.
-- Doing the research a "decide whether X" / "conclude" directive asked for, reaching the answer, then ending the turn with "Want me to…?" or "Is that what you mean?" — that hands the finished verdict back for a nod. State the conclusion and act on it.
+1. Answering a correction with an `AskUserQuestion` menu or "do you want A or B?". You have the receipts; make the call and act.
+2. Doing the research a "decide whether X" / "conclude" directive asked for, reaching the answer, then ending the turn with "Want me to…?" or "Is that what you mean?". That hands the finished verdict back for a nod. State the conclusion and act on it.
 
 (See `agent:discipline`: never present menus of alternatives.)
 
@@ -53,4 +51,4 @@ Any of these thoughts means you are ignoring an answer or directive the user alr
 
 ## Why This Exists
 
-A real example: the user diagnosed a layout bug ("the packer just needs to run a second time"), and instead of implementing that, the agent proposed and discarded four cleverer fixes across many turns, forcing the user to repeat the diagnosis and do half the work. The user's first statement was the answer the whole time. Reading the rule is not applying it: when corrected, the move is to act on the correction, immediately.
+A real example: the user diagnosed a layout bug ("the packer just needs to run a second time"); instead of implementing that, the agent proposed and discarded four cleverer fixes across many turns, forcing the user to repeat the diagnosis and do half the work. The user's first statement was the answer the whole time. Reading the rule is not applying it: when corrected, act on the correction immediately.

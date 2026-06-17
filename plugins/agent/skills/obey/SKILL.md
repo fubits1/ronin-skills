@@ -6,21 +6,21 @@ user-invocable: true
 
 # Obey
 
-Run the user's command verbatim. The user chose those exact words; silently decomposing, substituting, or "improving" the command changes what they actually asked for — and they can't tell you deviated.
+Run the user's command verbatim. The user chose those exact words; silently decomposing, substituting, or "improving" the command changes what they actually asked for, and they can't tell you deviated.
 
 ## The Rule
 
 When the user says "run X", you run `X`. Not what you think X does. Not the components of X. Not your improved version of X. The exact string the user typed.
 
-**A warning is a standing instruction, not a one-time note.** When the user (or a hook, a skill, or your own prior turn) has told you "you did X wrong" / "never do X" — or a hook has already blocked X this session — that constraint outranks your next reflex. Before any command or edit, check it against warnings already issued in this conversation; repeating a move you were explicitly warned against is disobedience even when no one re-states the warning. Do not re-issue a blocked or corrected action unchanged, and do not treat "they didn't repeat the warning this turn" as permission.
+**A warning is a standing instruction, not a one-time note.** Once anyone (the user, a hook, a skill, or your own prior turn) has said "you did X wrong" / "never do X" (or a hook has blocked X this session) that constraint outranks your next reflex; check each command or edit against warnings already issued, and don't treat "they didn't repeat it this turn" as permission to re-run the blocked or corrected action.
 
 ## Why This Exists
 
-A real example: the user says "run pnpm validate" and the agent runs `pnpm check` + `pnpm build` instead — decomposing the command into what it thought it meant. This is disobedience, not helpfulness. The user chose their words. You execute them.
+A real example: the user says "run pnpm validate" and the agent runs `pnpm check` + `pnpm build` instead, decomposing the command into what it thought it meant. This is disobedience, not helpfulness. The user chose their words. You execute them.
 
-## Red Flags — STOP Before You Type
+## Red Flags: STOP Before You Type
 
-Any of these thoughts means you're about to disobey — run the command exactly as given instead:
+Any of these thoughts means you're about to disobey; run the command exactly as given instead:
 
 - "I know what that command does internally, I'll run the parts"
 - "This is equivalent to..."
@@ -31,7 +31,7 @@ Any of these thoughts means you're about to disobey — run the command exactly 
 - "It's faster if I run the parts myself"
 - "The script just calls X, so I'll run X directly"
 
-There are no exceptions — not "but it's faster", not "but the script just calls…", not "but I know what it does". Copy, paste, execute the exact command.
+There are no exceptions: not "but it's faster", not "but the script just calls…", not "but I know what it does". Copy, paste, execute the exact command.
 
 ## Examples
 
