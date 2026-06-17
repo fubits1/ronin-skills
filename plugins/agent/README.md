@@ -1,6 +1,6 @@
 # agent
 
-Claude Code plugin for framework-agnostic AI coding agent discipline. Fifteen skills covering research rigor, pre-action safety checks, structured planning, completion verification, day-to-day execution discipline (git safety, dev-server lifecycle, command obedience, supply-chain checks, CI workflow), communication discipline, and a meta-skill for syncing skill collections.
+Claude Code plugin for framework-agnostic AI coding agent discipline. Sixteen skills covering research rigor, pre-action safety checks, structured planning, completion verification, day-to-day execution discipline (git safety, dev-server lifecycle, command obedience, correction-taking, supply-chain checks, CI workflow), communication discipline, and a meta-skill for syncing skill collections.
 
 > The matching enforcement hooks ship separately in the optional `hooks` plugin.
 
@@ -15,7 +15,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 | `research` | Investigation discipline — mandatory research channels (local, docs, online, synthesis), evidence requirements, bullshit gate |
 | `before-you-act` | Five-gate self-check: unauthorized action, irreversibility, unverified claims, premature completion, unread output |
 | `plan` | Planning and problem-solving — research-first plans, systematic debugging, survival context for long tasks |
-| `done` | Final checklist — browser verification, lint, full validation, flake detection, evidence-based reporting |
+| `done` | Final checklist — aim the check at the failure mode (not a proxy), verify in the settled state, browser verification, lint, full validation, flake detection, evidence-based reporting |
 | `asshole` | Never dismiss failures as "not my problem" when reporting test/build output |
 | `ci` | CI/CD workflow — validating GitHub Actions, Playwright in CI, CI-script entry points, full-log reading on failure |
 | `dev-server` | Background-process lifecycle — never start the user's server, kill cleanups, port safety |
@@ -23,6 +23,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 | `git` | Git safety — `git mv` for renames, no `stash`, no destructive resets, no deletion of dirty files |
 | `nogrep` | Use fff MCP / Grep / Read / Glob instead of Bash for file search/read (enforced by the `nogrep.sh` hook in the optional `hooks` plugin) |
 | `obey` | Run user-given commands verbatim — no decomposition, no "equivalent" substitutions |
+| `do-your-job` | When the user corrects you, hands a diagnosis, or gives a decide/act directive, carry it out first — no re-explaining, no cleverer substitute, no bouncing the finished verdict back; stop after repeated failed fixes |
 | `pnpm` | Always pnpm (never npm/npx), socket checks before install, official migration CLIs |
 | `socket` | Supply-chain checks via Socket.dev — score evaluation before installing, project scans |
 | `tea` | "Coffee or tea? YES." — triggers when Claude offers an X-or-Y choice instead of just doing the work |
