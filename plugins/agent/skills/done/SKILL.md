@@ -8,6 +8,13 @@ user-invocable: true
 
 Complete every gate below, in order, before declaring done — skipping a gate is how silent regressions ship. Show proof (exit codes, screenshots, measurements), not summaries.
 
+## 0. Aim the check at the failure mode, not a proxy
+
+- Before running any verification, name the exact property the task must prove and the symptom that would mean it failed — then pick the check that observes THAT symptom directly.
+- A green lint, a valid-markdown parse, a passing build, an autofixer run, a row/file count, or a mid-flight `ls` are NOT evidence for content correctness, "on latest version", "the bug is fixed", or "the data landed" — they measure a different property. If your check would still pass when the actual failure is present, it proves nothing.
+- Replace a proxy check with one that observes the real outcome: query the installed version and compare to upstream; diff the rendered/actual output against expected; reproduce the user's exact reported symptom and watch it disappear. "I ran a check and it was green" is not done unless that check would have gone RED on the specific failure you were asked to prevent.
+- **Verify in the SETTLED state, never a transient.** A mid-HMR reload, a mid-hydration paint, a mid-extraction install, a frozen output, or a mid-recompile screenshot is not a verdict. Wait for the process to finish (build settled, dev server done recompiling, hydration complete), then read THAT. Never declare broken OR done from an in-flight snapshot; if a read looks wrong right after a change that triggers a rebuild, wait and read once more before concluding.
+
 ## 1. Run validation
 
 - Run the project's full validation chain to exit 0. If the stack ships a validation or browser-verification skill, invoke it and follow every rule.
@@ -33,10 +40,15 @@ Complete every gate below, in order, before declaring done — skipping a gate i
 
 - If the stack has them (Svelte `mcp__svelte__svelte-autofixer` for `.svelte` / `.svelte.ts` / `.svelte.js`; ruff/black for Python; rustfmt for Rust), run the matching one on every file you touched.
 
-## 5. Lint edited CI workflows
+## 5. Remove your own debug instrumentation
+
+- Any logging, print, or temporary instrumentation you added while debugging (`console.log`, `dbg!`, `print(...)`, a temp constant, commented-out experiments) must be gone before done. Grep the files you touched for the markers you added and confirm zero remain — don't trust memory.
+- Scratch files you created for the task get deleted too. (Background servers: `agent:dev-server`. Screenshots belong in `/tmp/`: `frontend:playwright`.)
+
+## 6. Lint edited CI workflows
 
 - If any `.yml` workflow file was edited, run `pnpx node-actionlint <file>` to exit 0.
 
-## 6. Report with proof
+## 7. Report with proof
 
 - State what was verified with evidence — exit codes, screenshots, measurements. Not summaries. Proof.

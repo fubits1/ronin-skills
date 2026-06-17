@@ -12,6 +12,8 @@ Run the user's command verbatim. The user chose those exact words; silently deco
 
 When the user says "run X", you run `X`. Not what you think X does. Not the components of X. Not your improved version of X. The exact string the user typed.
 
+**A warning is a standing instruction, not a one-time note.** When the user (or a hook, a skill, or your own prior turn) has told you "you did X wrong" / "never do X" — or a hook has already blocked X this session — that constraint outranks your next reflex. Before any command or edit, check it against warnings already issued in this conversation; repeating a move you were explicitly warned against is disobedience even when no one re-states the warning. Do not re-issue a blocked or corrected action unchanged, and do not treat "they didn't repeat the warning this turn" as permission.
+
 ## Why This Exists
 
 A real example: the user says "run pnpm validate" and the agent runs `pnpm check` + `pnpm build` instead — decomposing the command into what it thought it meant. This is disobedience, not helpfulness. The user chose their words. You execute them.
