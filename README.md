@@ -19,7 +19,7 @@ Two plugins. The skills (`agent`) and the enforcement hooks (`hooks`) install se
 
 | Plugin | Contents | What it does |
 | --- | --- | --- |
-| [agent](plugins/agent/) | 15 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
+| [agent](plugins/agent/) | 16 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
 | [hooks](plugins/hooks/) | 4 hooks | Optional enforcement: nogrep (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
 
 ## Installation
@@ -114,7 +114,7 @@ If you don't install svelte-skills, the `agent` plugin still works fully — eve
 
 ## Context budget
 
-Claude Code allocates 1% of context window (fallback: 8,000 chars) for skill descriptions. Each description is capped at 250 chars. This marketplace adds ~15 skill descriptions on top of whatever else is installed.
+Claude Code allocates 1% of context window (fallback: 8,000 chars) for skill descriptions. Each description is capped at 250 chars. This marketplace adds ~16 skill descriptions on top of whatever else is installed.
 
 Run `/context` to check for budget warnings. Override with `SLASH_COMMAND_TOOL_CHAR_BUDGET=<chars>`.
 
