@@ -1,6 +1,6 @@
 ---
 name: before-you-act
-description: Use before any action: five-question self-check that catches destructive ops, scope creep, fabrication, premature completion, and ignored instructions. Auto-invoke before executing commands, editing files, or answering factual questions.
+description: "Use before any action: five-question self-check that catches destructive ops, scope creep, fabrication, premature completion, and ignored instructions. Auto-invoke before executing commands, editing files, or answering factual questions."
 user-invocable: true
 ---
 

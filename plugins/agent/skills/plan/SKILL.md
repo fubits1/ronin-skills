@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Planning and problem-solving discipline: enter plan mode first, write plans in the plan file (not chat), structured research, validation, implementation. Auto-invoke when the user says "plan", "make a plan", or when fixing issues or implementing features.
+description: 'Planning and problem-solving discipline: enter plan mode first, write plans in the plan file (not chat), structured research, validation, implementation. Auto-invoke when the user says "plan", "make a plan", or when fixing issues or implementing features.'
 user-invocable: true
 ---
 

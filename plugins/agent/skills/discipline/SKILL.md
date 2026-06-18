@@ -1,6 +1,6 @@
 ---
 name: discipline
-description: Communication and scope discipline: how to interact with the user, handle rejection, stay in scope. Always active.
+description: "Communication and scope discipline: how to interact with the user, handle rejection, stay in scope. Always active."
 user-invocable: true
 ---
 
