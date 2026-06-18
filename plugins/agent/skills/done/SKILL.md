@@ -12,6 +12,9 @@ Complete every gate below, in order, before declaring done. Skipping a gate is h
 
 - Name the exact property the task must prove and the symptom of failure, then pick a check that observes THAT symptom directly. A check that would still pass with the failure present proves nothing.
 - A green lint, valid-markdown parse, passing build, autofixer run, row/file count, or mid-flight `ls` measure a different property than content correctness, "on latest version", "bug fixed", or "data landed". Instead observe the real outcome: query the installed version vs upstream; diff actual output against expected; reproduce the user's reported symptom and watch it disappear. Done only if the check would have gone RED on the failure you were asked to prevent.
+- **Don't cite a green eval, especially one you wrote, to refuse or skip work.** A test that can't fail is not evidence the work is unneeded; force it RED on the real defect first (delete the code, feed wrong input, or flip the expected value).
+- **The acceptance target (threshold, unit, criterion) is itself a fact: read the source that defines it, never invent it** ("under 500 words" when the spec says "500 lines"). Quote it verbatim in your report.
+- **A subagent's "PASS" / "all green" is an unverified claim, not proof.** Re-derive it yourself: open the files it judged, diff before/after, or re-run the failing check.
 - **Verify in the SETTLED state, never a transient.** A mid-HMR/hydration/extraction/recompile snapshot or a frozen output is not a verdict. Never declare broken OR done from an in-flight snapshot. Wait for the process to finish, then read THAT; if a read looks wrong right after a rebuild-triggering change, wait and read once more before concluding.
 
 ## 1. Run validation

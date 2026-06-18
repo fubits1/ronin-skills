@@ -1,7 +1,7 @@
 ---
 name: research
 description: >-
-  Research discipline — how to investigate before acting,
+  Research discipline: how to investigate before acting,
   verify claims. Auto-invoke when researching, answering
   questions, or planning migrations.
 user-invocable: true
@@ -19,15 +19,15 @@ user-invocable: true
 ## Mandatory Research Channels
 
 When `/research` is invoked, hit ALL four channels before
-writing anything — skipping a channel is not research,
-it's guessing. (The one carve-out: a single trivial fact —
-does this flag exist, what is the latest version — needs
-only one authoritative source. Everything that is a
+writing anything; skipping a channel is not research,
+it's guessing. (The one carve-out: a single trivial fact,
+such as does this flag exist or what is the latest version,
+needs only one authoritative source. Everything that is a
 migration, an architectural question, "suggest better
 approaches", or "ARE YOU SURE?" gets the full four-channel
 sweep.) Minimum bar before presenting any non-trivial
 finding: at least one local read/grep AND one
-WebSearch/WebFetch — if you haven't used both, you haven't
+WebSearch/WebFetch; if you haven't used both, you haven't
 researched, go back and do it.
 
 ### 1. Local investigation
@@ -46,19 +46,19 @@ a blog post.
 
 ### 3. Online research
 
-WebSearch for ALL of these — not just the first one that
+WebSearch for ALL of these, not just the first one that
 returns results:
 
-- **GitHub issues and PRs** — the problem may be known
+- **GitHub issues and PRs**: the problem may be known
   and tracked, with existing solutions or workarounds in
   the comments
-- **Official docs and changelogs** — features you don't
+- **Official docs and changelogs**: features you don't
   know about, recent additions, migration guides
-- **Blog posts and tutorials** — how others solved the
+- **Blog posts and tutorials**: how others solved the
   same problem
-- **StackOverflow** — common pitfalls, edge cases,
+- **StackOverflow**: common pitfalls, edge cases,
   validated answers
-- **Existing solutions** — skills, plugins, hooks,
+- **Existing solutions**: skills, plugins, hooks,
   packages, configs that others have built and shared
 
 ### 4. Verify and synthesize
@@ -71,14 +71,14 @@ first search result as the final answer.
 ## "THOROUGHLY" = exhaustive first pass
 
 A data-flow / trace request must cover every hop in one
-pass — getting re-prompted for a forgotten layer is a
+pass; getting re-prompted for a forgotten layer is a
 fail. Layers to check before writing:
 
-1. Component tree: child → every parent, every render site
+1. Component tree: child to every parent, every render site
 2. Contexts + global stores: producers, consumers
 3. Outgoing props, `bind:*`, events
 4. TS DTOs / API call shape
-5. HTTP endpoint: path vs query vs body — which layer
+5. HTTP endpoint: path vs query vs body, which layer
    carries what
 6. Backend DTOs (Java/Kotlin/Python). Field-by-field vs
    TS. Mark fields TS does not send.
@@ -94,13 +94,13 @@ mark any layer N/A explicitly rather than silently skipping it.
 
 The failure that keeps happening: reading this skill, saying
 "let me research this", then writing an answer from existing
-knowledge without using a single search tool. Classic shape —
+knowledge without using a single search tool. Classic shape:
 asked to "suggest better approaches", the answer gets written
 from memory and misses that the problem is a known tracked bug
 with a community fix far better than the vibe answer.
 
 If you catch yourself about to write an answer without having
-used WebSearch or WebFetch — STOP. You are doing the thing. Go
+used WebSearch or WebFetch, STOP. You are doing the thing. Go
 search.
 
 ## Specific Rules
@@ -118,6 +118,13 @@ search.
   migrations.
 - Verify claims by running tools. Never answer yes/no
   from vibes.
+- **When checking against a defined class (banned
+  characters, lint rules, forbidden APIs, required fields),
+  enumerate it from the authoritative source, never from
+  memory**: recalling "the ones I remember" silently drops
+  the unchecked members (catches em-dashes, misses unicode
+  arrows). If you can't name where the full list lives, say
+  so.
 - Never claim something is a "known bug" or "pre-existing"
   without proof.
 - Never claim something isn't installed without verifying.
@@ -126,7 +133,7 @@ search.
   the run. Don't carry stale assumptions.
 - When the user reports a UI bug with specific interaction
   steps: trace the EXACT code path of those steps. Don't
-  investigate broadly — follow the user's reproduction
+  investigate broadly; follow the user's reproduction
   steps through the code.
 - **"ARE YOU SURE?" from the user IS a research request.**
   Invoke this skill immediately. Re-reading your own diff
@@ -140,9 +147,9 @@ flag, API, library behavior, or compatibility, ask:
 
 If the answer is "guess", STOP. Do one of:
 
-1. Say "I don't know" — this is always acceptable
-2. Run the tool/command to check — this takes seconds
-3. Use WebSearch/WebFetch to look it up — this takes seconds
+1. Say "I don't know": this is always acceptable
+2. Run the tool/command to check: this takes seconds
+3. Use WebSearch/WebFetch to look it up: this takes seconds
 
 **Red flags that you're about to bullshit:**
 
@@ -156,12 +163,12 @@ If the answer is "guess", STOP. Do one of:
 **Common bullshit patterns to recognize:**
 
 - Inventing flag values or argument semantics (e.g.
-  describing what `--pre 1` does — when the flag does not
+  describing what `--pre 1` does, when the flag does not
   accept that)
 - Misdescribing tool output (e.g. wrong claim about what
   `eslint --stats` reports)
 - Claiming version incompatibility that doesn't exist
-  (e.g. "X can't use Y yet" — when it has been working in
+  (e.g. "X can't use Y yet", when it has been working in
   the project for weeks)
 - Citing a closed GitHub issue as an unresolved blocker
 - Claiming a review finding was fixed when it wasn't

@@ -75,6 +75,7 @@ Before declaring anything complete:
 - Did every item get checked? (not 3 of 8)
 - Did verification pass? (not "it should work")
 - Does the user's evidence match mine? (if not, theirs wins)
+- A run that died, was killed, or exited non-zero partway leaves **partial** outputs: enumerate every artifact it touched and re-verify each (diff, re-read, re-run the check) before building on any of it.
 
 See `agent:done`.
 
