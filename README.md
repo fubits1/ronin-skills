@@ -20,7 +20,7 @@ Two plugins. The skills (`agent`) and the enforcement hooks (`hooks`) install se
 | Plugin | Contents | What it does |
 | --- | --- | --- |
 | [agent](plugins/agent/) | 16 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
-| [hooks](plugins/hooks/) | 4 hooks | Optional enforcement: nogrep (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
+| [hooks](plugins/hooks/) | 5 hooks | Optional enforcement: nogrep (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, no-honest (stop the agent vouching with `honest` instead of showing evidence), plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
 
 ## Installation
 
@@ -77,7 +77,7 @@ Skills in this marketplace have auto-invocation triggers defined in their descri
 
 ## Hooks
 
-The optional **`hooks`** plugin (`/plugin install hooks`) ships 4 enforcement hooks that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
@@ -85,6 +85,7 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 4 enforcement ho
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
+| `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 
 A `SessionStart` hook also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
 

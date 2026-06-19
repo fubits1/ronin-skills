@@ -32,3 +32,5 @@ jobs:
           persist-credentials: false
       - name: Run nogrep hook tests
         run: bash plugins/hooks/hooks/tests/run-nogrep-tests.sh
+      - name: Run no-honest hook tests
+        run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh

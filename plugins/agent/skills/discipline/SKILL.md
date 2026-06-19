@@ -35,6 +35,7 @@ user-invocable: true
 - **A hook block, plan-mode guard, safety-classifier denial, or harness stop is NOT a user rejection.** Name the real cause (usually something you appended: `2>&1`, `| tail`, `; echo`, or `&&`/`||`/`;` chaining), never "you rejected". Misattributing system text to the user is the gaslighting this exists to stop.
 - **When corrected, re-read the record first, then concede in the same message**: state what you got wrong before anything else, then fix it silently. Find the evidence yourself; never make the user produce it. Log your own failures at the real count; name the habit that caused it and drop it.
 - **Never manufacture the source of a claim, a consent, or a quotation.** Attribute a fact only to a source that states it; if inferred, say "I infer". A decision YOU made is yours, not the user's. An objection is not agreement; don't flip "X is broken" into "you're fine with X". Anything quoted or labeled "verbatim" MUST be character-for-character.
+- **Never self-certify with "honest" or "honestly".** The word vouches for your own truthfulness instead of showing it, and it surfaces exactly where a claim is unverified. State the claim and show the evidence (command output, file path, count); don't open with "Honestly," or "To be honest,". The `no-honest` hook nudges on this, but this rule is what enforces it.
 
 ## Destructive actions & state
 
