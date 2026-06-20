@@ -52,7 +52,7 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are **Bash/`jq` scripts — macOS and Linux only, not native Windows** (use WSL or Git Bash with `jq` on `PATH`). Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are a mix of runtimes: `nogrep.mjs` and `no-honest.mjs` are zero-dependency cross-OS Node (native Windows included); the rest (`force-plan-mode`, `no-absolute-paths`, auto-format) are **Bash/`jq` scripts — macOS and Linux, or WSL / Git Bash with `jq` on Windows**. Install only if you want enforcement:
 
 ```
 /plugin install hooks
@@ -77,17 +77,21 @@ Skills in this marketplace have auto-invocation triggers defined in their descri
 
 ## Hooks
 
-The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [nogrep.md](plugins/hooks/hooks/nogrep.md). |
+| `nogrep.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [nogrep.md](plugins/hooks/hooks/nogrep.md). |
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 
 A `SessionStart` hook also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+
+## Migration (0.4.x): `nogrep` moved from bash to Node
+
+The `nogrep` PreToolUse hook now ships as **`nogrep.mjs`** (Node), replacing the old `nogrep.sh` (bash). Plugin **shell** hooks do not run on native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), so `nogrep` was ported to a zero-dependency Node ESM script for cross-OS support. **Behavior is unchanged** — same blocks, same `reason=` tags — and it no longer needs `jq` at runtime. The Bash hooks (`force-plan-mode`, `no-absolute-paths`, auto-format) remain Bash/`jq` (macOS and Linux, or WSL / Git Bash on Windows); `no-honest.mjs` is also Node. Update with `/plugin marketplace update ronin-skills` + `/reload-plugins`. Design rationale: [hooks/nogrep.md](plugins/hooks/hooks/nogrep.md).
 
 ## Migration (0.2.x to 0.3.0)
 

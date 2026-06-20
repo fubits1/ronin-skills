@@ -1,8 +1,28 @@
-# nogrep.sh — rationale
+# nogrep — rationale
 
 Why this hook exists and why it is built this way. Every claim is sourced. The one-line
-header in `nogrep.sh` is too short to hold this, so the reasoning lives here next to the
+header in the hook is too short to hold this, so the reasoning lives here next to the
 code.
+
+## Runtime: `nogrep.mjs` (Node, cross-OS)
+
+The hook is **`nogrep.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
+`node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs`. It runs on every OS because Claude Code ships Node
+everywhere — a shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows
+plugin paths in any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed
+not-planned).
+
+Block mechanism: `exit 2` + a stderr message
+([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt quirk
+— not a reason to switch to JSON `permissionDecision`). Stdin is parsed in-process, no subprocess.
+`tests/run-nogrep-tests.mjs` and `tests/redteam-nogrep.mjs` hold the contract as fixed expectations
+(every block arm and bypass-fix pinned).
+
+**Known edge:** a banned tool obfuscated with a non-breaking space (`grep` + U+00A0 + `x`) still
+blocks — V8's `\s`/`\S` treat U+00A0 as whitespace, so `firstToken` splits the token and the ordinary
+grep arm catches it (an artifact of the regex engine, not bespoke unicode hardening; pinned by a
+test). Stricter, not a regression; unicode-obfuscation is outside the threat model below (a
+determined bypass beats a regex matcher).
 
 ## Why the hook exists
 
@@ -19,7 +39,7 @@ across three patterns; the heaviest (127 of them) is `cat > file <<EOF …` for 
 
 A PreToolUse hook is the enforcement layer left once the model won't self-correct and
 Anthropic won't enforce it. This is the established community pattern, not something novel:
-the widely-shared "Bash addiction" hook does the same thing. `nogrep.sh` is a more complete
+the widely-shared "Bash addiction" hook does the same thing. `nogrep.mjs` is a more complete
 version of it.
 
 ## What the hook actually buys
@@ -56,17 +76,23 @@ encodes nuance a flat rule can't, such as allowing `sed 's///'` substitution whi
 
 ## Threat model
 
-The hook steers a well-meaning agent toward the right tools. It is not an adversarial
-sandbox. A determined bypass (quoting tricks like `p''erl`, base64-decode piped to a shell)
-will beat a regex matcher, and the hook doesn't try to win that fight. Claude Code's own
+The hook disciplines a well-meaning agent's habits toward the right tools — it is **not a firewall**
+or an adversarial sandbox. It strips the shell's quote/escape _characters_ from a bareword tool name
+— backslashes anywhere (`\grep`, `g\rep`, `\c\a\t`), surrounding or embedded quotes (`'grep'`,
+`g""rep`, `"g"rep`), the `$'…'` prefix — and normalizes simple wrappers (`sudo`, `xargs`) and
+`bash -c` flags, because a well-meaning agent reaching for a banned tool produces exactly those. It
+does NOT decode escape _sequences_ or evaluate expansions: `$'\x67rep'` (hex), octal, base64-decode
+piped to a shell, `${x}cat` expansion, or a tool mutated inside `$(…)` will beat the regex matcher,
+and the hook doesn't try to win that fight: it shapes an agent's reflexes, it does not defend against
+an attacker. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
-([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with no
-dependency beyond `jq` is the right trade.
+([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero
+runtime dependencies is the right trade.
 
 ## How it works
 
-1. Read input via `jq -r '.tool_input.command // empty'`; empty means exit 0 (fail open).
+1. Read input by parsing stdin JSON for `.tool_input.command`; empty means exit 0 (fail open).
 2. Pre-extraction scans catch banned tools the segment splitter can't see: `bash -c "…"`,
    `$(…)` and backtick command substitution, `<(…)`/`>(…)` process substitution, and
    `node -e`/`python -c` shelling out via subprocess APIs.
@@ -96,7 +122,7 @@ A bypass that slips a banned tool through is a bug to fix here, not a loophole t
 Every block goes through one `block()` helper, because how the rejection reads back to the
 model matters as much as the block itself. The model has repeatedly mislabeled hook /
 permission blocks as "the user rejected me" and narrated past its own mistake, so each block
-is prefixed `[deterministic hook block from nogrep.sh — NOT a user rejection]` followed by a
+is prefixed `[deterministic hook block from nogrep.mjs — NOT a user rejection]` followed by a
 structured `BLOCKED | reason=…` line. The paired skill rule (`nogrep/SKILL.md` → "When the
 hook blocks a command") tells the model to read the `reason=` and switch to the dedicated
 tool rather than re-issue the same command.
@@ -106,8 +132,7 @@ tool rather than re-issue the same command.
 - regex, not a parser. A real bash AST parser
   ([oryband/claude-code-auto-approve](https://github.com/oryband/claude-code-auto-approve),
   shfmt + jq) is more robust per-segment but needs `shfmt` installed. This hook stays
-  regex-only to avoid any dependency beyond `jq`, which fits the nudge threat model
-- depends on `jq` for input parsing (the test harness fails fast if `jq` is absent)
+  regex-only with zero runtime dependencies (stdin parsed with `JSON.parse`), which fits the nudge threat model
 - adversarial evasion is out of scope by design (see threat model)
 
 ## Sources

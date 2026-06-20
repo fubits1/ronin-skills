@@ -21,7 +21,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 | `dev-server` | Background-process lifecycle — never start the user's server, kill cleanups, port safety |
 | `discipline` | Communication and scope discipline — interaction rules, rejection handling, scope-stays-fixed |
 | `git` | Git safety — `git mv` for renames, no `stash`, no destructive resets, no deletion of dirty files |
-| `nogrep` | Use fff MCP / Grep / Read / Glob instead of Bash for file search/read (enforced by the `nogrep.sh` hook in the optional `hooks` plugin) |
+| `nogrep` | Use fff MCP / Grep / Read / Glob instead of Bash for file search/read (enforced by the `nogrep.mjs` hook in the optional `hooks` plugin) |
 | `obey` | Run user-given commands verbatim — no decomposition, no "equivalent" substitutions |
 | `do-your-job` | When the user corrects you, hands a diagnosis, or gives a decide/act directive, carry it out first — no re-explaining, no cleverer substitute, no bouncing the finished verdict back; stop after repeated failed fixes |
 | `pnpm` | Always pnpm (never npm/npx), socket checks before install, official migration CLIs |
