@@ -7,25 +7,22 @@ code.
 ## Runtime: `nogrep.mjs` (Node, cross-OS)
 
 The hook is **`nogrep.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
-`node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs`. It replaced an earlier bash version because plugin
-**shell** hooks do not run on Windows — Claude Code's `/bin/bash` cannot resolve Windows plugin
-paths in any format ([#18610](https://github.com/anthropics/claude-code/issues/18610), closed
-not-planned). Node ships on every platform, so the Node hook runs everywhere.
+`node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs`. It runs on every OS because Claude Code ships Node
+everywhere — a shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows
+plugin paths in any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed
+not-planned).
 
-The port keeps the **exact** block mechanism — `exit 2` + a stderr message
-([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt
-quirk that hits shell and Node equally, so it is not a reason to switch to JSON `permissionDecision`).
-It drops the runtime `jq` dependency (stdin is parsed with `JSON.parse`). Behavior was proven
-identical to the retired bash version across the full corpus (68/68) and an adversarial battery
-before the `.sh` was removed; `tests/run-nogrep-tests.mjs` and `tests/redteam-nogrep.mjs` now hold
-the contract as fixed expectations. The one cost: Node's process-startup tax makes it ~10 ms/call
-slower than bash (~24 ms vs ~14 ms) — negligible against tool-call latency, the price of cross-OS
-support.
+Block mechanism: `exit 2` + a stderr message
+([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt quirk
+— not a reason to switch to JSON `permissionDecision`). Stdin is parsed in-process, no subprocess.
+`tests/run-nogrep-tests.mjs` and `tests/redteam-nogrep.mjs` hold the contract as fixed expectations
+(every block arm and bypass-fix pinned).
 
-**Known edge:** on a banned tool obfuscated with a non-breaking space (`grep` + U+00A0 + `x`), the
-Node hook blocks where the old bash/`awk` parser was inconsistent. This is stricter, and
-unicode-obfuscation is outside the threat model below (a determined bypass beats a regex matcher) —
-not a regression.
+**Known edge:** a banned tool obfuscated with a non-breaking space (`grep` + U+00A0 + `x`) still
+blocks — V8's `\s`/`\S` treat U+00A0 as whitespace, so `firstToken` splits the token and the ordinary
+grep arm catches it (an artifact of the regex engine, not bespoke unicode hardening; pinned by a
+test). Stricter, not a regression; unicode-obfuscation is outside the threat model below (a
+determined bypass beats a regex matcher).
 
 ## Why the hook exists
 

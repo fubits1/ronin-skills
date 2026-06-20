@@ -22,7 +22,9 @@ function run(cmd) {
     input: payload,
     encoding: "utf8",
   });
-  return { code: r.status, stderr: r.stderr || "" };
+  if (r.error) return { code: -1, stderr: "spawn error: " + r.error.message };
+  // status is null when the process is killed by a signal (e.g. timeout) — never read that as ALLOW.
+  return { code: r.status === null ? -2 : r.status, stderr: r.stderr || "" };
 }
 function runCase(expected, label, cmd) {
   const { code } = run(cmd);
@@ -72,6 +74,28 @@ runCase(2, "BLOCK", "echo a ; echo b");
 runCase(2, "BLOCK", "true || echo fallback");
 runCase(2, "BLOCK", "npx markdownlint-cli2 README.md ; echo done");
 runCase(2, "BLOCK", "cd src && pnpm test");
+// bash -c bypasses (flags / wrappers / sed / recursion)
+runCase(2, "BLOCK", 'bash -lc "grep x"');
+runCase(2, "BLOCK", 'bash --login -c "cat x"');
+runCase(2, "BLOCK", 'bash -c "env timeout grep x"');
+runCase(2, "BLOCK", 'bash -c "sed -n 1,5p f"');
+// wrapper + interpreter shell-out bypasses
+runCase(2, "BLOCK", "sudo grep x");
+runCase(2, "BLOCK", "doas cat f");
+runCase(2, "BLOCK", "watch grep x f");
+runCase(2, "BLOCK", "parallel grep x");
+runCase(2, "BLOCK", "perl -e 'system(\"grep x\")'");
+runCase(2, "BLOCK", "ruby -e 'exec \"cat f\"'");
+runCase(2, "BLOCK", "node -e \"require('child_process').execSync('grep x')\"");
+runCase(
+  2,
+  "BLOCK",
+  "python3 -c \"import subprocess; subprocess.run(['cat'])\"",
+);
+runCase(2, "BLOCK", "env env env env env env env env env grep x"); // 9 wrappers > cap
+runCase(2, "BLOCK", "git remote rm origin");
+runCase(2, "BLOCK", "cat <<EOF"); // heredoc → Write
+runCase(2, "BLOCK", "echo `grep x`"); // backtick-sub
 
 console.log("\n=== ALLOW fixtures (expect exit 0) ===");
 runCase(0, "ALLOW", "ls");
@@ -89,6 +113,12 @@ runCase(0, "ALLOW", "echo hi > /tmp/x");
 runCase(0, "ALLOW", 'echo "a && b"');
 runCase(0, "ALLOW", 'node -e "let x=1; console.log(x)"');
 runCase(0, "ALLOW", 'sed "s/;/,/g" file');
+runCase(0, "ALLOW", 'bash -c "echo cat"'); // banned word as echo arg, not a command
+runCase(0, "ALLOW", 'perl -e "print 1"'); // no shell-out
+runCase(0, "ALLOW", "git remote -v");
+runCase(0, "ALLOW", "watch date");
+runCase(0, "ALLOW", "make build");
+runCase(0, "ALLOW", "sudo make install");
 
 console.log(
   "\n=== Message-content fixtures (block fires with the RIGHT message) ===",
@@ -102,6 +132,14 @@ runMsg("reason=chaining", "MSG", "pnpm build && pnpm test");
 runMsg("SEPARATE Bash call", "MSG", "pnpm build && pnpm test");
 runMsg("Grep tool", "MSG", "grep x f");
 runMsg("Glob tool", "MSG", "find .");
+runMsg("reason=bashc-banned", "MSG", 'bash -lc "grep x"');
+runMsg("reason=perl-ruby-shellout", "MSG", "perl -e 'system(\"grep\")'");
+runMsg(
+  "reason=wrapper-depth",
+  "MSG",
+  "env env env env env env env env env grep x",
+);
+runMsg("reason=git-mutation", "MSG", "git remote rm origin");
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);

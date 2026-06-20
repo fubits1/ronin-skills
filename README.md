@@ -77,7 +77,7 @@ Skills in this marketplace have auto-invocation triggers defined in their descri
 
 ## Hooks
 
-The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
@@ -88,6 +88,10 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement ho
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 
 A `SessionStart` hook also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+
+## Migration (0.4.x): `nogrep` moved from bash to Node
+
+The `nogrep` PreToolUse hook now ships as **`nogrep.mjs`** (Node), replacing the old `nogrep.sh` (bash). Plugin **shell** hooks do not run on native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), so `nogrep` was ported to a zero-dependency Node ESM script for cross-OS support. **Behavior is unchanged** — same blocks, same `reason=` tags — and it no longer needs `jq` at runtime. The other hooks (`force-plan-mode`, `no-absolute-paths`, auto-format) remain Bash/`jq` (macOS and Linux, or WSL / Git Bash on Windows). Update with `/plugin marketplace update ronin-skills` + `/reload-plugins`. Design rationale: [hooks/nogrep.md](plugins/hooks/hooks/nogrep.md).
 
 ## Migration (0.2.x to 0.3.0)
 
