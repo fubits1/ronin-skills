@@ -91,7 +91,7 @@ A `SessionStart` hook also injects a mandatory directive to invoke the `discipli
 
 ## Migration (0.4.x): `nogrep` moved from bash to Node
 
-The `nogrep` PreToolUse hook now ships as **`nogrep.mjs`** (Node), replacing the old `nogrep.sh` (bash). Plugin **shell** hooks do not run on native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), so `nogrep` was ported to a zero-dependency Node ESM script for cross-OS support. **Behavior is unchanged** — same blocks, same `reason=` tags — and it no longer needs `jq` at runtime. The other hooks (`force-plan-mode`, `no-absolute-paths`, auto-format) remain Bash/`jq` (macOS and Linux, or WSL / Git Bash on Windows). Update with `/plugin marketplace update ronin-skills` + `/reload-plugins`. Design rationale: [hooks/nogrep.md](plugins/hooks/hooks/nogrep.md).
+The `nogrep` PreToolUse hook now ships as **`nogrep.mjs`** (Node), replacing the old `nogrep.sh` (bash). Plugin **shell** hooks do not run on native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), so `nogrep` was ported to a zero-dependency Node ESM script for cross-OS support. **Behavior is unchanged** — same blocks, same `reason=` tags — and it no longer needs `jq` at runtime. The Bash hooks (`force-plan-mode`, `no-absolute-paths`, auto-format) remain Bash/`jq` (macOS and Linux, or WSL / Git Bash on Windows); `no-honest.mjs` is also Node. Update with `/plugin marketplace update ronin-skills` + `/reload-plugins`. Design rationale: [hooks/nogrep.md](plugins/hooks/hooks/nogrep.md).
 
 ## Migration (0.2.x to 0.3.0)
 

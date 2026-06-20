@@ -96,6 +96,9 @@ runCase(2, "BLOCK", "env env env env env env env env env grep x"); // 9 wrappers
 runCase(2, "BLOCK", "git remote rm origin");
 runCase(2, "BLOCK", "cat <<EOF"); // heredoc → Write
 runCase(2, "BLOCK", "echo `grep x`"); // backtick-sub
+runCase(2, "BLOCK", "'grep' x"); // fully-quoted tool name
+runCase(2, "BLOCK", 'g""rep x'); // empty-quote split
+runCase(2, "BLOCK", '"g"rep x'); // partial quote
 
 console.log("\n=== ALLOW fixtures (expect exit 0) ===");
 runCase(0, "ALLOW", "ls");
@@ -119,6 +122,8 @@ runCase(0, "ALLOW", "git remote -v");
 runCase(0, "ALLOW", "watch date");
 runCase(0, "ALLOW", "make build");
 runCase(0, "ALLOW", "sudo make install");
+runCase(0, "ALLOW", 'echo "step 1; cat results"'); // banned word in quoted arg after ; — not a command
+runCase(0, "ALLOW", 'pnpm run "build && grep"'); // banned word in quoted arg after &&
 
 console.log(
   "\n=== Message-content fixtures (block fires with the RIGHT message) ===",

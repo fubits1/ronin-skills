@@ -60,10 +60,16 @@ console.log("\n=== Bypass vectors must BLOCK ===");
 expect("BLOCK", "command-builtin", "builtin-command", "command grep x");
 expect("BLOCK", "bash-find", "abs-path", "/usr/bin/find .");
 expect("BLOCK", "bash-grep", "backslash-escape", "\\grep x");
+expect("BLOCK", "bash-grep", "quoted-full", "'grep' x");
+expect("BLOCK", "bash-grep", "quoted-empty", 'g""rep x');
+expect("BLOCK", "bash-grep", "quoted-partial", '"g"rep x');
+expect("BLOCK", "bash-grep", "quoted-split", "g'r'ep x");
+expect("BLOCK", "cat-read", "quoted-cat", "'cat' f");
 expect("BLOCK", "dollar-sub", "dollar-sub", "echo $(grep x f)");
 expect("BLOCK", "backtick-sub", "backtick-sub", "echo `grep x f`");
 expect("BLOCK", "procsub", "proc-sub", "diff <(cat a) <(cat b)");
 expect("BLOCK", "bash-grep", "wrapper-timeout", "timeout 5 grep x f");
+expect("BLOCK", "bash-grep", "nbsp-obfuscation", "grep x"); // non-breaking space; V8 \s splits it
 expect("BLOCK", "sed-read", "sed-read-n", "sed -n 1,5p f");
 expect("BLOCK", "sed-read", "sed-read-np", "sed 5p f");
 expect("BLOCK", "cat-read", "subshell-group", "(cat secret)");
@@ -190,6 +196,9 @@ expect("ALLOW", "-", "node-clean", 'node -e "let x=1; console.log(x)"');
 expect("ALLOW", "-", "watch-date", "watch date");
 expect("ALLOW", "-", "sudo-make", "sudo make install");
 expect("ALLOW", "-", "make-build", "make build");
+expect("ALLOW", "-", "banned-in-quote-semi", 'echo "step 1; cat results"');
+expect("ALLOW", "-", "banned-in-quote-and", 'pnpm run "build && grep"');
+expect("ALLOW", "-", "semi-in-dq-arg", 'echo "first; awk it then cat"');
 
 console.log("\n=== Edge cases ===");
 expect("ALLOW", "-", "trailing-semi", "echo hi;");

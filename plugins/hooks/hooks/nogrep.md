@@ -76,9 +76,13 @@ encodes nuance a flat rule can't, such as allowing `sed 's///'` substitution whi
 
 ## Threat model
 
-The hook steers a well-meaning agent toward the right tools. It is not an adversarial
-sandbox. A determined bypass (quoting tricks like `p''erl`, base64-decode piped to a shell)
-will beat a regex matcher, and the hook doesn't try to win that fight. Claude Code's own
+The hook disciplines a well-meaning agent's habits toward the right tools — it is **not a firewall**
+or an adversarial sandbox. It normalizes the common reflex evasions (leading backslash, surrounding
+or embedded quotes like `'grep'` / `g""rep`, simple wrappers like `sudo` / `xargs`, `bash -c` flags),
+because an agent reaching for a banned tool tends to produce exactly those. But a determined
+adversarial bypass (quote-mutation inside `$(…)`, `p''erl -e`, base64-decode piped to a shell) will
+beat a regex matcher, and the hook doesn't try to win that fight: it shapes an agent's reflexes, it
+does not defend against an attacker. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
 ([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero
