@@ -77,12 +77,14 @@ encodes nuance a flat rule can't, such as allowing `sed 's///'` substitution whi
 ## Threat model
 
 The hook disciplines a well-meaning agent's habits toward the right tools — it is **not a firewall**
-or an adversarial sandbox. It normalizes the common reflex evasions (leading backslash, surrounding
-or embedded quotes like `'grep'` / `g""rep`, simple wrappers like `sudo` / `xargs`, `bash -c` flags),
-because an agent reaching for a banned tool tends to produce exactly those. But a determined
-adversarial bypass (quote-mutation inside `$(…)`, `p''erl -e`, base64-decode piped to a shell) will
-beat a regex matcher, and the hook doesn't try to win that fight: it shapes an agent's reflexes, it
-does not defend against an attacker. Claude Code's own
+or an adversarial sandbox. It strips the shell's quote/escape _characters_ from a bareword tool name
+— backslashes anywhere (`\grep`, `g\rep`, `\c\a\t`), surrounding or embedded quotes (`'grep'`,
+`g""rep`, `"g"rep`), the `$'…'` prefix — and normalizes simple wrappers (`sudo`, `xargs`) and
+`bash -c` flags, because a well-meaning agent reaching for a banned tool produces exactly those. It
+does NOT decode escape _sequences_ or evaluate expansions: `$'\x67rep'` (hex), octal, base64-decode
+piped to a shell, `${x}cat` expansion, or a tool mutated inside `$(…)` will beat the regex matcher,
+and the hook doesn't try to win that fight: it shapes an agent's reflexes, it does not defend against
+an attacker. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
 ([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero

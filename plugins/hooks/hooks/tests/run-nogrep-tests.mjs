@@ -99,6 +99,9 @@ runCase(2, "BLOCK", "echo `grep x`"); // backtick-sub
 runCase(2, "BLOCK", "'grep' x"); // fully-quoted tool name
 runCase(2, "BLOCK", 'g""rep x'); // empty-quote split
 runCase(2, "BLOCK", '"g"rep x'); // partial quote
+runCase(2, "BLOCK", "g\\rep x"); // mid-token backslash
+runCase(2, "BLOCK", "\\c\\a\\t f"); // backslash between every char
+runCase(2, "BLOCK", "$'grep' x"); // ANSI-C literal quoting
 
 console.log("\n=== ALLOW fixtures (expect exit 0) ===");
 runCase(0, "ALLOW", "ls");
