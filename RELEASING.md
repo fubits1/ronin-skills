@@ -69,7 +69,7 @@ Conventional Commits. Plugin scope is always `agent` while the marketplace has a
 
 ```
 feat(agent): new self-check skill
-fix(agent): nogrep hook handles xargs wrapper
+fix(agent): no-bash hook handles xargs wrapper
 chore(release): v0.1.0
 docs: clarify install order
 ```

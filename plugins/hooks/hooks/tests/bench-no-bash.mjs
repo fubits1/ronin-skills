@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// Performance benchmark for nogrep.mjs — pure Node, cross-OS. Times the hook per call on typical
+// Performance benchmark for no-bash.mjs — pure Node, cross-OS. Times the hook per call on typical
 // commands, and on ADVERSARIAL LARGE inputs to prove the regexes + splitSegments + recursion stay
 // LINEAR (no ReDoS / catastrophic backtracking). The hooks.json timeout is 5000 ms; algorithm cost
 // on a 200KB+ crafted input must be a tiny fraction of that.
 //
-//   node plugins/hooks/hooks/tests/bench-nogrep.mjs
+//   node plugins/hooks/hooks/tests/bench-no-bash.mjs
 
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const HOOK = join(HERE, "..", "nogrep.mjs");
+const HOOK = join(HERE, "..", "no-bash.mjs");
 
 function medianMs(cmd, n) {
   const payload = JSON.stringify({ tool_input: { command: cmd } });
@@ -55,6 +55,9 @@ const big = [
   ["200KB $(...) body", "echo $(" + "a ".repeat(100000) + ")"],
   ["100k backslashes", "\\".repeat(100000) + "grep x"],
   ["50 nested wrappers", "env ".repeat(50) + "grep x"],
+  // heredoc-strip stressors (lazy `[\s\S]*?` scan): unterminated openers must not go quadratic
+  ["40k '<<X ' one-line", "<<X ".repeat(40000)],
+  ["40k '<<X\\n' multiline", "<<X\n".repeat(40000)],
 ];
 let worst = 0;
 for (const [label, cmd] of big) {

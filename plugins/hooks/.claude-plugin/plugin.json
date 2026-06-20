@@ -4,5 +4,5 @@
   "author": {
     "name": "fubits1"
   },
-  "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: nogrep (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, and an auto-formatter. Install to opt into enforcement. Requires agent@ronin-skills for the skills these hooks reference."
+  "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: no-bash (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, an auto-formatter, and no-honest (Stop-event evidence-over-vouching nudge). Install to opt into enforcement. Requires agent@ronin-skills for the skills these hooks reference."
 }

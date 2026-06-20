@@ -6,7 +6,7 @@ user-invocable: true
 
 # Before You Act
 
-**ALWAYS** invoke `agent:nogrep` before file search/read operations.
+**ALWAYS** invoke `agent:no-bash` before file search/read operations.
 
 ## Consider before doing it yourself
 

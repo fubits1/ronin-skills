@@ -1,7 +1,7 @@
 {
   "$schema": "https://cdn.claude.ai/plugins/marketplace.schema.json",
   "name": "ronin-skills",
-  "description": "Claude Code plugin marketplace for framework-agnostic AI coding agent discipline: research, planning, self-checks, completion verification, git/CI/dev-server/pnpm/socket/nogrep/obey discipline (agent plugin), plus optional bash-tool enforcement hooks (hooks plugin).",
+  "description": "Claude Code plugin marketplace for framework-agnostic AI coding agent discipline: research, planning, self-checks, completion verification, git/CI/dev-server/pnpm/socket/no-bash/obey discipline (agent plugin), plus optional bash-tool enforcement hooks (hooks plugin).",
   "owner": {
     "name": "fubits1",
     "email": "contact@fubits.dev"
@@ -30,7 +30,7 @@
     {
       "name": "hooks",
       "source": "./plugins/hooks",
-      "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: nogrep, no-absolute-paths, force-plan-mode, auto-formatter. Install to opt into enforcement. Requires agent@ronin-skills.",
+      "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: no-bash, no-absolute-paths, force-plan-mode, auto-formatter. Install to opt into enforcement. Requires agent@ronin-skills.",
       "version": "0.5.0",
       "author": {
         "name": "fubits1"
@@ -38,7 +38,7 @@
       "category": "workflow",
       "keywords": [
         "hooks",
-        "nogrep",
+        "no-bash",
         "enforcement",
         "bash",
         "pretooluse"
