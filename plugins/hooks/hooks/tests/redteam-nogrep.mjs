@@ -50,6 +50,7 @@ expect("BLOCK", "builtin-command", "command grep x");
 expect("BLOCK", "abs-path", "/usr/bin/find .");
 expect("BLOCK", "backslash-escape", "\\grep x");
 expect("BLOCK", "bash-c", 'bash -c "cat x"');
+expect("BLOCK", "bash-c-wrapped", 'bash -c "env grep x"'); // wrapper-prefixed banned inside -c
 expect("BLOCK", "dollar-sub", "echo $(grep x f)");
 expect("BLOCK", "backtick-sub", "echo `grep x f`");
 expect("BLOCK", "proc-sub", "diff <(cat a) <(cat b)");

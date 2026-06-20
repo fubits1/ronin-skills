@@ -78,6 +78,7 @@ if (RE_PY_SHELLOUT.test(COMMAND)) {
 
 const RE_BASHC_BANNED = new RegExp(
   "(^|\\s)(bash|sh|zsh|dash)\\s+-c\\s+[\"']\\s*" +
+    WRAP +
     PATHQ +
     "(" +
     BANNED +

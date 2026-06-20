@@ -52,7 +52,7 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are **Bash/`jq` scripts — macOS and Linux only, not native Windows** (use WSL or Git Bash with `jq` on `PATH`). Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are a mix of runtimes: `nogrep.mjs` and `no-honest.mjs` are zero-dependency cross-OS Node (native Windows included); the rest (`force-plan-mode`, `no-absolute-paths`, auto-format) are **Bash/`jq` scripts — macOS and Linux, or WSL / Git Bash with `jq` on Windows**. Install only if you want enforcement:
 
 ```
 /plugin install hooks

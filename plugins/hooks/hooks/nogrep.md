@@ -84,8 +84,8 @@ sandbox. A determined bypass (quoting tricks like `p''erl`, base64-decode piped 
 will beat a regex matcher, and the hook doesn't try to win that fight. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
-([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with no
-dependency beyond `jq` is the right trade.
+([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero
+runtime dependencies is the right trade.
 
 ## How it works
 
@@ -129,8 +129,7 @@ tool rather than re-issue the same command.
 - regex, not a parser. A real bash AST parser
   ([oryband/claude-code-auto-approve](https://github.com/oryband/claude-code-auto-approve),
   shfmt + jq) is more robust per-segment but needs `shfmt` installed. This hook stays
-  regex-only to avoid any dependency beyond `jq`, which fits the nudge threat model
-- depends on `jq` for input parsing (the test harness fails fast if `jq` is absent)
+  regex-only with zero runtime dependencies (stdin parsed with `JSON.parse`), which fits the nudge threat model
 - adversarial evasion is out of scope by design (see threat model)
 
 ## Sources
