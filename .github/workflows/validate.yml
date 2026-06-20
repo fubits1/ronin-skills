@@ -30,7 +30,14 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Run nogrep hook tests
-        run: bash plugins/hooks/hooks/tests/run-nogrep-tests.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: nogrep functional tests
+        run: node plugins/hooks/hooks/tests/run-nogrep-tests.mjs
+      - name: nogrep redteam suite
+        run: node plugins/hooks/hooks/tests/redteam-nogrep.mjs
+      - name: nogrep mock-install proof
+        run: node plugins/hooks/hooks/tests/mock-install-nogrep.mjs
       - name: Run no-honest hook tests
         run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh

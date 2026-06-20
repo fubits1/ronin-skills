@@ -81,7 +81,7 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement ho
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `nogrep.sh` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Rationale + sources: [nogrep.md](plugins/hooks/hooks/nogrep.md). |
+| `nogrep.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [nogrep.md](plugins/hooks/hooks/nogrep.md). |
 | `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |

@@ -1,8 +1,31 @@
-# nogrep.sh — rationale
+# nogrep — rationale
 
 Why this hook exists and why it is built this way. Every claim is sourced. The one-line
-header in `nogrep.sh` is too short to hold this, so the reasoning lives here next to the
+header in the hook is too short to hold this, so the reasoning lives here next to the
 code.
+
+## Runtime: `nogrep.mjs` (Node, cross-OS)
+
+The hook is **`nogrep.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
+`node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs`. It replaced an earlier bash version because plugin
+**shell** hooks do not run on Windows — Claude Code's `/bin/bash` cannot resolve Windows plugin
+paths in any format ([#18610](https://github.com/anthropics/claude-code/issues/18610), closed
+not-planned). Node ships on every platform, so the Node hook runs everywhere.
+
+The port keeps the **exact** block mechanism — `exit 2` + a stderr message
+([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt
+quirk that hits shell and Node equally, so it is not a reason to switch to JSON `permissionDecision`).
+It drops the runtime `jq` dependency (stdin is parsed with `JSON.parse`). Behavior was proven
+identical to the retired bash version across the full corpus (68/68) and an adversarial battery
+before the `.sh` was removed; `tests/run-nogrep-tests.mjs` and `tests/redteam-nogrep.mjs` now hold
+the contract as fixed expectations. The one cost: Node's process-startup tax makes it ~10 ms/call
+slower than bash (~24 ms vs ~14 ms) — negligible against tool-call latency, the price of cross-OS
+support.
+
+**Known edge:** on a banned tool obfuscated with a non-breaking space (`grep` + U+00A0 + `x`), the
+Node hook blocks where the old bash/`awk` parser was inconsistent. This is stricter, and
+unicode-obfuscation is outside the threat model below (a determined bypass beats a regex matcher) —
+not a regression.
 
 ## Why the hook exists
 
@@ -19,7 +42,7 @@ across three patterns; the heaviest (127 of them) is `cat > file <<EOF …` for 
 
 A PreToolUse hook is the enforcement layer left once the model won't self-correct and
 Anthropic won't enforce it. This is the established community pattern, not something novel:
-the widely-shared "Bash addiction" hook does the same thing. `nogrep.sh` is a more complete
+the widely-shared "Bash addiction" hook does the same thing. `nogrep.mjs` is a more complete
 version of it.
 
 ## What the hook actually buys
@@ -66,7 +89,7 @@ dependency beyond `jq` is the right trade.
 
 ## How it works
 
-1. Read input via `jq -r '.tool_input.command // empty'`; empty means exit 0 (fail open).
+1. Read input by parsing stdin JSON for `.tool_input.command`; empty means exit 0 (fail open).
 2. Pre-extraction scans catch banned tools the segment splitter can't see: `bash -c "…"`,
    `$(…)` and backtick command substitution, `<(…)`/`>(…)` process substitution, and
    `node -e`/`python -c` shelling out via subprocess APIs.
@@ -96,7 +119,7 @@ A bypass that slips a banned tool through is a bug to fix here, not a loophole t
 Every block goes through one `block()` helper, because how the rejection reads back to the
 model matters as much as the block itself. The model has repeatedly mislabeled hook /
 permission blocks as "the user rejected me" and narrated past its own mistake, so each block
-is prefixed `[deterministic hook block from nogrep.sh — NOT a user rejection]` followed by a
+is prefixed `[deterministic hook block from nogrep.mjs — NOT a user rejection]` followed by a
 structured `BLOCKED | reason=…` line. The paired skill rule (`nogrep/SKILL.md` → "When the
 hook blocks a command") tells the model to read the `reason=` and switch to the dedicated
 tool rather than re-issue the same command.
