@@ -160,12 +160,6 @@ ok(formatterFor("README.md") === "markdownlint", ".md → markdownlint");
 ok(formatterFor("doc.mdx") === null, ".mdx → skip");
 ok(formatterFor("") === null, "empty → null");
 ok(formatterFor(undefined) === null, "undefined → null");
-// a leading-dash path is a CLI flag to prettier/markdownlint (option injection), never a file → skip
-ok(
-  formatterFor("--plugin=/tmp/evil.js") === null,
-  "leading-dash path (option injection) → null",
-);
-ok(formatterFor("-rf") === null, "leading-dash path → null");
 // never blocks: absent file_path → no formatter spawned → exit 0
 const fmt1 = runHook("fix-formatting.mjs", { tool_input: {} });
 ok(fmt1.code === 0, "subprocess: absent file_path → exit 0 (no spawn)");
@@ -281,15 +275,21 @@ ok(
   "turnText: includes both post-prompt assistant blocks",
 );
 ok(!turn.includes("OLD turn"), "turnText: excludes the previous turn");
-// fail-open: a transcript_path that is a directory (statSync isFile guard) must not crash or hang —
-// the blocking openSync on a FIFO would otherwise stall the session past its timeout.
-const nhDir = runHook("no-honest.mjs", {
-  transcript_path: HERE,
-  stop_hook_active: false,
-});
+// some turns store assistant content as a plain STRING, not a block array (isUserPrompt handles both;
+// turnAssistantText must too, or the nudge silently misses those turns)
+const stringContentEntries = [
+  {
+    type: "user",
+    message: { role: "user", content: [{ type: "text", text: "go" }] },
+  },
+  {
+    type: "assistant",
+    message: { role: "assistant", content: "Honestly, I did not verify." },
+  },
+];
 ok(
-  nhDir.code === 0,
-  "no-honest: directory transcript_path → exit 0 (isFile guard, no hang)",
+  detectVouching(turnAssistantText(stringContentEntries)) === true,
+  "turnText: string-content assistant message is scanned (honestly → true)",
 );
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);

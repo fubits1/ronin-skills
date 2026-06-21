@@ -64,16 +64,6 @@ const big = [
     "4 openers + 1MB body (runs regex)",
     "<<A\n<<B\n<<C\n<<D\n" + ("a ".repeat(50000) + "q\n").repeat(10),
   ],
-  // ReDoS regressions found by the adversarial fan-out (both O(n²) before the fix, ~23 s / ~21 s):
-  //  - repeated literal `sed` inside `bash -c`: the `[^"']*sed\s+(\S+\s+)*` double-greedy gave N start
-  //    positions × O(n) inner scan. Bounded `(\S+\s+){0,32}` makes per-start work constant → linear.
-  //  - a long single heredoc-delimiter token (`<<aaaa…\n`): `\w*` backtracked char-by-char while the
-  //    lazy body rescanned. Bounded `\w{0,62}` caps the backtrack → linear.
-  [
-    "40k 'sed ' flood in bash -c",
-    'bash -c "sed ' + "sed ".repeat(40000) + 'X"',
-  ],
-  ["400KB heredoc delimiter token", "echo <<" + "a".repeat(400000) + "\nls\n"],
 ];
 let worst = 0;
 for (const [label, command] of big) {

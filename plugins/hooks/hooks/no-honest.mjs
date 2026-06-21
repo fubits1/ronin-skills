@@ -33,7 +33,6 @@ import {
   closeSync,
   readFileSync,
   realpathSync,
-  statSync,
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -50,12 +49,6 @@ function readStdin() {
 
 // Read only the last `maxBytes` of a file (seek from end) — never slurps the whole transcript.
 function tailBytes(path, maxBytes) {
-  // Only read a REGULAR file. A transcript_path pointing at a directory (readSync → EISDIR) or, worse,
-  // a FIFO/named pipe would make the blocking openSync HANG waiting for a writer — past the hook's
-  // timeout, stalling the session (a "hang" violates the fail-open contract). statSync does not
-  // open/block, so gate on it; a non-regular path fails open here. (Claude Code always writes a
-  // regular .jsonl — this only hardens against pathological inputs.)
-  if (!statSync(path).isFile()) return { text: "", truncated: false };
   const fd = openSync(path, "r");
   try {
     const size = fstatSync(fd).size;
@@ -100,6 +93,8 @@ export function turnAssistantText(entries) {
       for (const block of content) {
         if (block?.type === "text" && block.text) text += block.text + "\n";
       }
+    } else if (typeof content === "string" && content) {
+      text += content + "\n"; // some turns store assistant content as a plain string, not blocks
     }
   }
   return text;

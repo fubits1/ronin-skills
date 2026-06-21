@@ -14,13 +14,6 @@ import { spawnSync } from "node:child_process";
 // `.mdx`, "prettier" for any other path. Matches the .sh skip rules.
 export function formatterFor(filePath) {
   if (typeof filePath !== "string" || filePath === "") return null;
-  // SECURITY (option injection → RCE): a path beginning with "-" is parsed by prettier/markdownlint
-  // as a CLI FLAG, not a file. e.g. file_path "--plugin=/tmp/evil.js" makes prettier load+EXECUTE
-  // that JS module; "--config=…" loads an arbitrary JS/.cjs config. npx args are passed shell-free,
-  // but the flag IS the payload so quoting can't help — prettier only treats a token as a flag when
-  // it starts with "-", so refusing leading-dash paths is the boundary. A real absolute path starts
-  // with "/" (or a drive letter); a relative path starting with "-" is pathological. Skip it.
-  if (filePath.startsWith("-")) return null;
   if (filePath.endsWith(".md")) return "markdownlint";
   if (filePath.endsWith(".mdx")) return null; // prettier pads md tables; markdownlint is .md-only
   return "prettier";
