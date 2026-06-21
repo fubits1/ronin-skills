@@ -16,7 +16,16 @@ Block mechanism: `exit 2` + a stderr message
 ([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt quirk
 — not a reason to switch to JSON `permissionDecision`). Stdin is parsed in-process, no subprocess.
 `tests/run-no-bash-tests.mjs` and `tests/redteam-no-bash.mjs` hold the contract as fixed expectations
-(every block arm plus the false-positive guards pinned).
+(every block arm plus the false-positive guards pinned). `scan()` is exported so harnesses can call it
+in-process; the hook still runs as a script when executed directly (a realpath-compared guard, with a
+fail-safe toward *running*, so a symlinked install path can't silently disable it).
+
+Beyond fixed fixtures, `tests/validate-no-bash.mjs` is the full-scale gate: it cross-checks the hook
+against an **independent POSIX parsing oracle** (`oracle.py`, python3 `shlex`) and ~6k seeded-fuzz
+cases, so a quote/escape/segmentation bug the author never thought to write a fixture for still fails
+the build (it catches, e.g., the single-quote `echo 'a\' ; cat …` regression that hand-picked fixtures
+missed). `tests/replay-transcript-no-bash.mjs` is an ad-hoc gate that replays the real Bash commands
+from session transcripts to surface false positives on commands actually issued in practice.
 
 ## Why the hook exists
 
@@ -110,7 +119,10 @@ runtime dependencies is the right trade.
      `git config --get`, `git clean -n`, `git apply --check`, `git fetch --dry-run`,
      `git remote -v`, `git mv`). Global options before the subcommand (`git -C`, `-c k=v`,
      `--no-pager`) are stripped first so they can't hide a mutation. `git grep` routes to
-     `Grep`.
+     `Grep`. `git config` and `git tag` are **not** blocked at all (including their write
+     forms `git config user.name …` / `git tag v1`): they are local, non-destructive, and
+     have no `gh` equivalent, so the read-only `--get`/`-l` forms — the common reflex — must
+     pass and blocking the write forms buys nothing.
 6. No-chaining check (runs after the per-tool arms, so a banned-tool message wins). It counts
    the top-level commands quote/heredoc/continuation aware: a real `&&`, `||`, `;`, or a bare
    newline BETWEEN commands counts as chaining and blocks with a message telling Claude to run

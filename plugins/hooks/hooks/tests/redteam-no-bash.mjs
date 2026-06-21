@@ -173,6 +173,15 @@ expect("ALLOW", "-", "banned-in-dq-arg", 'echo "first; awk it then cat"');
 expect("ALLOW", "-", "trailing-semi", "echo hi;");
 expect("ALLOW", "-", "escaped-inner-quotes", 'echo "say \\"hi; bye\\""');
 expect("ALLOW", "-", "single-quote-semi", "echo 'a; b; c'");
+// escaped quote mid-string must not close the quote and expose a following `; cat` as a segment
+expect("ALLOW", "-", "escaped-quote-then-semi-cat", 'echo "a \\"; cat b"');
+// inside SINGLE quotes bash does NOT process `\`, so `'a\'` closes and `; cat` IS a real segment
+expect(
+  "BLOCK",
+  "cat-read",
+  "sq-trailing-backslash-cat",
+  "echo 'a\\' ; cat secret",
+);
 
 console.log(
   "\n=== Read-only git must ALLOW (mutating git blocks, read-only git passes) ===",

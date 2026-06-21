@@ -42,5 +42,9 @@ jobs:
         run: node plugins/hooks/hooks/tests/redteam-no-bash.mjs
       - name: no-bash mock-install proof
         run: node plugins/hooks/hooks/tests/mock-install-no-bash.mjs
+      - name: no-bash full-scale validation (shlex oracle + seeded fuzz)
+        run: node plugins/hooks/hooks/tests/validate-no-bash.mjs
+      - name: no-bash benchmark (perf / no-ReDoS gate)
+        run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
       - name: Run no-honest hook tests
         run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh

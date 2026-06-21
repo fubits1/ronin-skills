@@ -51,5 +51,8 @@ but the directives reference skills you won't have.
 node plugins/hooks/hooks/tests/run-no-bash-tests.mjs    # CI: no-bash.mjs functional contract
 node plugins/hooks/hooks/tests/redteam-no-bash.mjs      # CI: no-bash.mjs adversarial / edge-case battery
 node plugins/hooks/hooks/tests/mock-install-no-bash.mjs # CI: no-bash.mjs install-wiring proof
+node plugins/hooks/hooks/tests/validate-no-bash.mjs     # CI: shlex-oracle differential + seeded fuzz (needs python3)
+node plugins/hooks/hooks/tests/bench-no-bash.mjs        # CI: perf / no-ReDoS gate
+node plugins/hooks/hooks/tests/replay-transcript-no-bash.mjs <dir>  # ad-hoc: replay real session commands for false positives
 bash plugins/hooks/hooks/tests/run-no-honest-tests.sh  # CI: the no-honest Stop hook
 ```

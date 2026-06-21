@@ -65,11 +65,11 @@ Semver, pre-1.0.
 
 ## Commit convention
 
-Conventional Commits. Plugin scope is always `agent` while the marketplace has a single plugin:
+Conventional Commits. Scope is the plugin the change touches — `agent` (skills) or `hooks` (enforcement hooks):
 
 ```
 feat(agent): new self-check skill
-fix(agent): no-bash hook handles xargs wrapper
+fix(hooks): no-bash hook handles xargs wrapper
 chore(release): v0.1.0
 docs: clarify install order
 ```

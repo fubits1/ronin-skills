@@ -12,7 +12,8 @@
 // non-string command, unparseable stdin, or any internal throw → exit 0; a hook bug must never break
 // the session. Zero dependencies (stdin + JSON.parse).
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc";
 const WRAP =
@@ -77,7 +78,7 @@ const MSG = {
   "python-shellout":
     "Use the dedicated tool (Grep/Read/Glob) instead of shelling out to subprocess from inside an embedded Python script.",
   "bashc-banned":
-    "A blocked command (banned tool, mutating git, or sed-read) was invoked via 'bash -c' / 'sh -c'. Run it directly at the top level instead of wrapping it in a shell, so the hook can point you at the right tool.",
+    "A banned file-read/search tool (or sed-read) was invoked via 'bash -c' / 'sh -c'. Run it directly at the top level instead of wrapping it in a shell, so the hook can point you at the right tool.",
   "bashc-sed-read":
     "'sed' used as a reader inside bash -c / sh -c. Use the Read tool (offset/limit) instead.",
   "dollar-sub":
@@ -171,9 +172,9 @@ function chainCount(command) {
   let q = null;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
-    if (c === "\\") {
-      i++; // an escaped char is inert (e.g. \" never toggles a quote)
-      continue;
+    if (c === "\\" && q !== "'") {
+      i++; // an escaped char is inert (e.g. \" never toggles a quote) — but bash does NOT process
+      continue; // backslash inside single quotes, so don't treat it as an escape there
     }
     if (q) {
       if (c === q) q = null; // inside a quote: drop everything (incl. ; && and newlines)
@@ -266,6 +267,14 @@ function splitSegments(s) {
   let q = null;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
+    if (c === "\\" && q !== "'") {
+      // an escaped char is literal, never structural: keep both, so `\"` doesn't toggle a quote and
+      // `\;`/`\&`/`\|` don't split a segment (mirrors chainCount). Bash does NOT process backslash
+      // inside single quotes, so don't treat it as an escape there (else a `'…\'` keeps the quote open).
+      cur += c;
+      if (i + 1 < s.length) cur += s[++i];
+      continue;
+    }
     if (q) {
       cur += c;
       if (c === q) q = null;
@@ -289,7 +298,7 @@ function splitSegments(s) {
   return out;
 }
 
-function scan(command) {
+export function scan(command) {
   if (typeof command !== "string" || command === "") return null;
 
   if (RE_NODE_SHELLOUT.test(command)) return blk("node-shellout");
@@ -370,9 +379,23 @@ function main() {
   }
 }
 
+// Run the hook only when executed directly (`node no-bash.mjs`); when imported (validation harness),
+// export scan() without reading stdin or exiting. realpath BOTH sides so a symlinked invocation path
+// (macOS /var→/private/var, %20-encoding, etc.) still matches — and on ANY uncertainty default to
+// running, because a hook that silently fails to fire is far worse than one that runs when imported.
+let runAsHook = true;
 try {
-  main();
+  runAsHook =
+    realpathSync(process.argv[1]) ===
+    realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  // any internal error → fail open (best-effort discipline; never break the session)
+  runAsHook = true;
 }
-process.exit(0);
+if (runAsHook) {
+  try {
+    main();
+  } catch {
+    // any internal error → fail open (best-effort discipline; never break the session)
+  }
+  process.exit(0);
+}

@@ -37,7 +37,7 @@ console.log(
 for (const [label, cmd] of [
   ["typical block (cat x)", "cat x"],
   ["chaining", "pnpm build && pnpm test"],
-  ["bash -c recursion", 'bash -c "env timeout grep x"'],
+  ["bash -c (nested wrappers)", 'bash -c "env timeout grep x"'],
   ["quoted bypass ('grep' x)", "'grep' x"],
   ["quoted arg w/ ops", 'echo "step 1; cat results"'],
 ]) {
@@ -55,9 +55,15 @@ const big = [
   ["200KB $(...) body", "echo $(" + "a ".repeat(100000) + ")"],
   ["100k backslashes", "\\".repeat(100000) + "grep x"],
   ["50 nested wrappers", "env ".repeat(50) + "grep x"],
-  // heredoc-strip stressors (lazy `[\s\S]*?` scan): unterminated openers must not go quadratic
-  ["40k '<<X ' one-line", "<<X ".repeat(40000)],
-  ["40k '<<X\\n' multiline", "<<X\n".repeat(40000)],
+  // heredoc-strip stressors for the lazy `[\s\S]*?` scan:
+  //  - flood: >4 `<<` openers FAIL the `<=4` guard, so the regex is skipped (proves the guard caps it)
+  //  - guard-passing: exactly 4 openers + a huge non-terminating body DOES run the regex — the worst
+  //    case that actually reaches it; must stay LINEAR (one lazy pass to EOS per opener, not quadratic)
+  ["40k '<<X' flood (guard skips regex)", "<<X\n".repeat(40000)],
+  [
+    "4 openers + 1MB body (runs regex)",
+    "<<A\n<<B\n<<C\n<<D\n" + ("a ".repeat(50000) + "q\n").repeat(10),
+  ],
 ];
 let worst = 0;
 for (const [label, cmd] of big) {
@@ -70,3 +76,7 @@ for (const [label, cmd] of big) {
 console.log(
   `\nWorst large-input total: ${worst.toFixed(1)} ms  (${((worst / 5000) * 100).toFixed(2)}% of the 5000 ms hook timeout). ${worst < 250 ? "LINEAR — no ReDoS." : "INVESTIGATE — possible super-linear blowup."}`,
 );
+// Gate: fail CI only on a genuine super-linear blowup (these linear cases run ~100 ms even on a 1MB
+// body; 2000 ms = 40% of the timeout would mean a real ReDoS regression). Wall-clock is noisy, so the
+// threshold is generous to avoid flakes.
+process.exit(worst < 2000 ? 0 : 1);
