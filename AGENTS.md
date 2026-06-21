@@ -36,6 +36,7 @@ Hooks are zero-dependency Node ESM. From the repo root:
 # full hook test suite
 node plugins/hooks/hooks/tests/run-no-bash-tests.mjs
 node plugins/hooks/hooks/tests/redteam-no-bash.mjs
+node plugins/hooks/hooks/tests/mock-install-no-bash.mjs
 node plugins/hooks/hooks/tests/validate-no-bash.mjs
 node plugins/hooks/hooks/tests/bench-no-bash.mjs
 node plugins/hooks/hooks/tests/run-hook-tests.mjs

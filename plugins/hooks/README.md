@@ -54,5 +54,5 @@ node plugins/hooks/hooks/tests/validate-no-bash.mjs     # CI: shlex-oracle diffe
 node plugins/hooks/hooks/tests/bench-no-bash.mjs        # CI: perf / no-ReDoS gate
 node plugins/hooks/hooks/tests/replay-transcript-no-bash.mjs <dir>  # ad-hoc: replay real session commands for false positives
 node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start
-node plugins/hooks/hooks/tests/run-no-honest-tests.mjs   # CI: the no-honest Stop hook
+node plugins/hooks/hooks/tests/run-no-honest-tests.mjs  # CI: the no-honest Stop hook
 ```
