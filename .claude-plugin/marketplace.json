@@ -11,7 +11,7 @@
       "name": "agent",
       "source": "./plugins/agent",
       "description": "AI coding agent discipline: research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills only; install the hooks plugin for enforcement. Requires superpowers plugin.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "fubits1"
       },
@@ -31,7 +31,7 @@
       "name": "hooks",
       "source": "./plugins/hooks",
       "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: no-bash, no-absolute-paths, force-plan-mode, auto-formatter, no-honest. Install to opt into enforcement. Requires agent@ronin-skills.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "fubits1"
       },
@@ -47,5 +47,5 @@
       "license": "MIT"
     }
   ],
-  "version": "0.6.0"
+  "version": "0.7.0"
 }
