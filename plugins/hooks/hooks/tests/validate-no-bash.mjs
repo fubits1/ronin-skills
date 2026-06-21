@@ -362,7 +362,9 @@ function oracleVerdict(parsed) {
   for (const segment of segments) {
     if (segment.length && BANNED_WORDS.has(segment[0])) return "BLOCK";
   }
-  // chaining: count real commands split on ; && || only (pipe/& are not chaining)
+  // chaining: `segsep` is a COMMAND COUNT, not a separator count — oracle.py sets it to
+  // 1 + (number of top-level `;`/`&&`/`||` tokens), so `>= 2` means two or more commands joined by
+  // those operators (pipe `|` and single `&` are NOT chaining per the hook's policy, so not counted).
   if (parsed.segsep && parsed.segsep >= 2) return "BLOCK";
   return "ALLOW";
 }
