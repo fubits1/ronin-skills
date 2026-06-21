@@ -9,22 +9,21 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 > not just one repo. A bug in a Bash hook affects every project at once. Install only if you
 > want that enforcement everywhere.
 
-> **Mixed runtimes.** `no-bash.mjs` and `no-honest.mjs` are zero-dependency Node scripts that run
-> cross-OS (native Windows included) — they need only `node` on `PATH`, present wherever Claude
-> Code runs, and no `jq` at runtime. The remaining hooks (`force-plan-mode.sh`,
-> `no-absolute-paths.sh`, `fix-formatting.sh`) are Bash scripts using `sed`/`awk`/`jq`: they run on
-> macOS and Linux, and on Windows need WSL or Git Bash / MSYS with `jq` on `PATH` (not native
-> `cmd.exe` or PowerShell). `jq` is required for those Bash hooks and for the test harness (which
-> fails fast without it).
+> **All Node, cross-OS.** Every hook is a zero-dependency Node script that runs on every OS Claude
+> Code supports (native Windows included) — they need only `node` on `PATH` and no `jq`/`bash` at
+> runtime. The only subprocess is the auto-formatter (`fix-formatting.mjs`), which spawns
+> `npx prettier` / `markdownlint-cli2` (both ship with Node). A plugin **shell** hook can't run on
+> native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), which is why
+> none remain.
 
 ## Hooks
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
 | `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included). Rationale + sources: [hooks/no-bash.md](hooks/no-bash.md). |
-| `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. and injects a directive forcing `EnterPlanMode` as the next tool call. |
-| `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
-| `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
+| `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. and injects a directive forcing `EnterPlanMode` as the next tool call. |
+| `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
+| `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [hooks/no-honest.md](hooks/no-honest.md). |
 
 A `SessionStart` hook also injects a directive to invoke the `agent:discipline` skill at the
@@ -33,7 +32,7 @@ start of every session.
 ## Requires the `agent` plugin
 
 These hooks reference `agent` skills: the SessionStart directive invokes `agent:discipline`,
-`force-plan-mode.sh` drives the `agent:plan` flow, and `no-bash.mjs`'s block messages point at
+`force-plan-mode.mjs` drives the `agent:plan` flow, and `no-bash.mjs`'s block messages point at
 the `agent:no-bash` skill. Install `agent` first. Without it the hooks still block correctly,
 but the directives reference skills you won't have.
 
@@ -54,5 +53,7 @@ node plugins/hooks/hooks/tests/mock-install-no-bash.mjs # CI: no-bash.mjs instal
 node plugins/hooks/hooks/tests/validate-no-bash.mjs     # CI: shlex-oracle differential + seeded fuzz (needs python3)
 node plugins/hooks/hooks/tests/bench-no-bash.mjs        # CI: perf / no-ReDoS gate
 node plugins/hooks/hooks/tests/replay-transcript-no-bash.mjs <dir>  # ad-hoc: replay real session commands for false positives
+node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start
+node plugins/hooks/hooks/tests/diff-hooks.mjs           # ad-hoc: old-.sh-vs-new-.mjs equivalence differential (needs bash/jq + the .sh in git HEAD)
 bash plugins/hooks/hooks/tests/run-no-honest-tests.sh  # CI: the no-honest Stop hook
 ```

@@ -58,5 +58,7 @@ jobs:
         run: node plugins/hooks/hooks/tests/validate-no-bash.mjs
       - name: no-bash benchmark (perf / no-ReDoS gate)
         run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
+      - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start)
+        run: node plugins/hooks/hooks/tests/run-hook-tests.mjs
       - name: Run no-honest hook tests
         run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh
