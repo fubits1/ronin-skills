@@ -1,5 +1,5 @@
 ---
-name: nogrep
+name: no-bash
 description: "Use fff MCP / Grep / Read / Glob — never Bash grep/cat/find/head/tail/sed/awk/rg/wc — for file search and read. Use jq for JSON parsing/shaping (not node -e / python -c). A hook hard-blocks the banned Bash calls, and the dedicated tools return clean, cacheable, line-numbered results. Auto-invoke when searching, reading, or counting in files."
 user-invocable: true
 ---
@@ -18,7 +18,7 @@ The reason is not permission clicks: Claude Code runs `grep`/`cat`/`head`/`tail`
 - Built-in tool approvals cache. Unique Bash content, especially `cat > file` heredocs, never caches, so a human re-reviews it on every run (the heaviest pattern in claude-code#19649).
 - The hook fires where the system prompt fails. The model ignores its own "don't use Bash for this" instruction ~40% of sessions, more after context compaction and in subagents. Anthropic closed that as not-planned (claude-code#39979), so enforcement has to live in a hook.
 
-The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plugins/hooks/hooks/nogrep.mjs`) that hard-blocks the wrong Bash calls. This skill is the educational mapping and lives in `agent`; the hook is the enforcement and lives in `hooks`. Without the `hooks` plugin installed, this skill still guides; it just isn't enforced. Full rationale and sources: `plugins/hooks/hooks/nogrep.md`.
+The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plugins/hooks/hooks/no-bash.mjs`) that hard-blocks the wrong Bash calls. This skill is the educational mapping and lives in `agent`; the hook is the enforcement and lives in `hooks`. Without the `hooks` plugin installed, this skill still guides; it just isn't enforced. Full rationale and sources: `plugins/hooks/hooks/no-bash.md`.
 
 ## Tool Preference Order
 
@@ -119,7 +119,7 @@ These are legitimate Bash uses — either they have no dedicated tool equivalent
 
 A `BLOCKED` line from this hook is a **deterministic environment rejection — NOT the user rejecting you.** The block message says so explicitly. Do not narrate it as "the user rejected my command"; the user did not act. Read the `reason=` field, switch to the dedicated tool, and never re-issue the same blocked command unchanged — it will fail identically.
 
-Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, or a node/python shell-out — the hook catches those too. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/nogrep.mjs`, not a loophole to exploit.
+Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, or a node/python shell-out — the hook catches those too. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/no-bash.mjs`, not a loophole to exploit.
 
 ## git Commands (permission routing)
 

@@ -1,13 +1,13 @@
-# nogrep — rationale
+# no-bash — rationale
 
 Why this hook exists and why it is built this way. Every claim is sourced. The one-line
 header in the hook is too short to hold this, so the reasoning lives here next to the
 code.
 
-## Runtime: `nogrep.mjs` (Node, cross-OS)
+## Runtime: `no-bash.mjs` (Node, cross-OS)
 
-The hook is **`nogrep.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
-`node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs`. It runs on every OS because Claude Code ships Node
+The hook is **`no-bash.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
+`node ${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs`. It runs on every OS because Claude Code ships Node
 everywhere — a shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows
 plugin paths in any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed
 not-planned).
@@ -15,14 +15,17 @@ not-planned).
 Block mechanism: `exit 2` + a stderr message
 ([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt quirk
 — not a reason to switch to JSON `permissionDecision`). Stdin is parsed in-process, no subprocess.
-`tests/run-nogrep-tests.mjs` and `tests/redteam-nogrep.mjs` hold the contract as fixed expectations
-(every block arm and bypass-fix pinned).
+`tests/run-no-bash-tests.mjs` and `tests/redteam-no-bash.mjs` hold the contract as fixed expectations
+(every block arm plus the false-positive guards pinned). `scan()` is exported so harnesses can call it
+in-process; the hook still runs as a script when executed directly (a realpath-compared guard, with a
+fail-safe toward *running*, so a symlinked install path can't silently disable it).
 
-**Known edge:** a banned tool obfuscated with a non-breaking space (`grep` + U+00A0 + `x`) still
-blocks — V8's `\s`/`\S` treat U+00A0 as whitespace, so `firstToken` splits the token and the ordinary
-grep arm catches it (an artifact of the regex engine, not bespoke unicode hardening; pinned by a
-test). Stricter, not a regression; unicode-obfuscation is outside the threat model below (a
-determined bypass beats a regex matcher).
+Beyond fixed fixtures, `tests/validate-no-bash.mjs` is the full-scale gate: it cross-checks the hook
+against an **independent POSIX parsing oracle** (`oracle.py`, python3 `shlex`) and ~6k seeded-fuzz
+cases, so a quote/escape/segmentation bug the author never thought to write a fixture for still fails
+the build (it catches, e.g., the single-quote `echo 'a\' ; cat …` regression that hand-picked fixtures
+missed). `tests/replay-transcript-no-bash.mjs` is an ad-hoc gate that replays the real Bash commands
+from session transcripts to surface false positives on commands actually issued in practice.
 
 ## Why the hook exists
 
@@ -39,7 +42,7 @@ across three patterns; the heaviest (127 of them) is `cat > file <<EOF …` for 
 
 A PreToolUse hook is the enforcement layer left once the model won't self-correct and
 Anthropic won't enforce it. This is the established community pattern, not something novel:
-the widely-shared "Bash addiction" hook does the same thing. `nogrep.mjs` is a more complete
+the widely-shared "Bash addiction" hook does the same thing. `no-bash.mjs` is a more complete
 version of it.
 
 ## What the hook actually buys
@@ -77,14 +80,12 @@ encodes nuance a flat rule can't, such as allowing `sed 's///'` substitution whi
 ## Threat model
 
 The hook disciplines a well-meaning agent's habits toward the right tools — it is **not a firewall**
-or an adversarial sandbox. It strips the shell's quote/escape _characters_ from a bareword tool name
-— backslashes anywhere (`\grep`, `g\rep`, `\c\a\t`), surrounding or embedded quotes (`'grep'`,
-`g""rep`, `"g"rep`), the `$'…'` prefix — and normalizes simple wrappers (`sudo`, `xargs`) and
-`bash -c` flags, because a well-meaning agent reaching for a banned tool produces exactly those. It
-does NOT decode escape _sequences_ or evaluate expansions: `$'\x67rep'` (hex), octal, base64-decode
-piped to a shell, `${x}cat` expansion, or a tool mutated inside `$(…)` will beat the regex matcher,
-and the hook doesn't try to win that fight: it shapes an agent's reflexes, it does not defend against
-an attacker. Claude Code's own
+or an adversarial sandbox. It catches the model's plain reflexes: a banned tool as the command, a
+`cat > file` heredoc, mutating git, gratuitous chaining, and a banned tool wrapped in `bash -c "…"`,
+`$(…)`, backticks, `<(…)`, or a simple process wrapper (`timeout`, `nice`, `env`, `xargs`). It does
+NOT chase deliberate evasion — quote/escape mutation (`'grep'`, mid-name backslash, ANSI-C `$'…'`),
+encoding, expansion, or a tool hidden inside an arbitrary construct — because the model has no reason
+to obfuscate its own command to slip past its own discipline hook. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
 ([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero
@@ -102,18 +103,36 @@ runtime dependencies is the right trade.
 4. `normalize_first` reduces a segment to its effective first word, mirroring Claude Code's
    own matcher: it strips `VAR=value` prefixes, leading group-openers (`(` / `{`), leading
    backslash, path qualification, and process wrappers (`timeout`, `nice`, `env`, `exec`,
-   `xargs`).
+   `xargs` — including the `-I {}` replstr of the `xargs -I {} grep …` idiom).
 5. Per-tool arms block the banned first word with a message naming the right tool. Special
-   cases: `cat > file`/heredoc routes to `Write` (not Read); `sed -n`/`Np` reads block while
-   `sed 's///'` substitution passes; mutating `git` blocks while read-only `git` and
-   `git mv` pass.
-6. No-chaining check (runs after the per-tool arms, so a banned-tool message wins). If the
-   command joins two real commands with `&&`, `||`, or `;`, it blocks with a message telling
-   Claude to run each as a separate Bash call. Chaining is a documented permission-bypass
-   class (claude-code #13371/#4956/#28784/#16180/#20085): the native matcher can validate
-   only the first segment of a chain. It's also the agent's bash-one-liner reflex, not a
-   need; Claude Code persists the Bash working dir across calls, so even `cd dir && cmd` is
-   unnecessary. Pipes into `jq` and redirections (`>`, `2>&1`) are not chaining and pass.
+   cases discriminate read from write, so the hook does not false-positive on a legit read:
+   - `cat` routes to `Write` only for a real stdout file-write (`cat … > f`, `>>`) or a
+     heredoc (`<<EOF`); a stderr redirect (`2>/dev/null`, `2>&1`, `1>&2`) or a `<<<`
+     here-string is still a read and routes to `Read`.
+   - `sed -n`/`Np` reads block while `sed 's///'` substitution passes.
+   - `command -v foo` (POSIX existence check) passes; `command grep …` (execution bypass)
+     blocks.
+   - `git` is mutation-vs-read discriminated by subcommand (`gitMutates`): a write form
+     blocks (`commit`, `push`, `reset`, `stash`/`stash pop`, `clean -fd`, `apply`, `branch
+     -D`, `worktree add`, `submodule update`, `git -C <path> commit`, …) while the read /
+     inspection form of the same subcommand passes (`git stash list`, `git tag -l`,
+     `git config --get`, `git clean -n`, `git apply --check`, `git fetch --dry-run`,
+     `git remote -v`, `git mv`). Global options before the subcommand (`git -C`, `-c k=v`,
+     `--no-pager`) are stripped first so they can't hide a mutation. `git grep` routes to
+     `Grep`. `git config` and `git tag` are **not** blocked at all (including their write
+     forms `git config user.name …` / `git tag v1`): they are local, non-destructive, and
+     have no `gh` equivalent, so the read-only `--get`/`-l` forms — the common reflex — must
+     pass and blocking the write forms buys nothing.
+6. No-chaining check (runs after the per-tool arms, so a banned-tool message wins). It counts
+   the top-level commands quote/heredoc/continuation aware: a real `&&`, `||`, `;`, or a bare
+   newline BETWEEN commands counts as chaining and blocks with a message telling Claude to run
+   each as a separate Bash call. A newline INSIDE a quoted argument (a multi-line `--body`/`-m`
+   value), a `\`-newline line-continuation, and a heredoc body are one logical command and do
+   NOT count. Chaining is a documented permission-bypass class (claude-code
+   #13371/#4956/#28784/#16180/#20085): the native matcher can validate only the first segment
+   of a chain. It's also the agent's bash-one-liner reflex, not a need; Claude Code persists
+   the Bash working dir across calls, so even `cd dir && cmd` is unnecessary. Pipes into `jq`
+   and redirections (`>`, `2>&1`) are not chaining and pass.
 
 A bypass that slips a banned tool through is a bug to fix here, not a loophole to use.
 
@@ -122,8 +141,8 @@ A bypass that slips a banned tool through is a bug to fix here, not a loophole t
 Every block goes through one `block()` helper, because how the rejection reads back to the
 model matters as much as the block itself. The model has repeatedly mislabeled hook /
 permission blocks as "the user rejected me" and narrated past its own mistake, so each block
-is prefixed `[deterministic hook block from nogrep.mjs — NOT a user rejection]` followed by a
-structured `BLOCKED | reason=…` line. The paired skill rule (`nogrep/SKILL.md` → "When the
+is prefixed `[deterministic hook block from no-bash.mjs — NOT a user rejection]` followed by a
+structured `BLOCKED | reason=…` line. The paired skill rule (`no-bash/SKILL.md` → "When the
 hook blocks a command") tells the model to read the `reason=` and switch to the dedicated
 tool rather than re-issue the same command.
 

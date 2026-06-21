@@ -27,6 +27,18 @@ jobs:
             claude plugin validate "$d" || exit 1
           done
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: oxlint (code-style — curly, etc.)
+        run: npx --yes oxlint@1.70.0 .
+
   hook-tests:
     runs-on: ubuntu-latest
     steps:
@@ -36,11 +48,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - name: nogrep functional tests
-        run: node plugins/hooks/hooks/tests/run-nogrep-tests.mjs
-      - name: nogrep redteam suite
-        run: node plugins/hooks/hooks/tests/redteam-nogrep.mjs
-      - name: nogrep mock-install proof
-        run: node plugins/hooks/hooks/tests/mock-install-nogrep.mjs
+      - name: no-bash functional tests
+        run: node plugins/hooks/hooks/tests/run-no-bash-tests.mjs
+      - name: no-bash redteam suite
+        run: node plugins/hooks/hooks/tests/redteam-no-bash.mjs
+      - name: no-bash mock-install proof
+        run: node plugins/hooks/hooks/tests/mock-install-no-bash.mjs
+      - name: no-bash full-scale validation (shlex oracle + seeded fuzz)
+        run: node plugins/hooks/hooks/tests/validate-no-bash.mjs
+      - name: no-bash benchmark (perf / no-ReDoS gate)
+        run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
       - name: Run no-honest hook tests
         run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh

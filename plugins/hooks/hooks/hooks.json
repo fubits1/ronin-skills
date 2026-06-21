@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/nogrep.mjs",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs",
             "timeout": 5
           },
           {
