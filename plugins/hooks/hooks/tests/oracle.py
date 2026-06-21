@@ -21,15 +21,15 @@ import sys
 import json
 
 
-def analyze(cmd):
+def analyze(command):
     try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
     except ValueError as e:
-        return {"cmd": cmd, "toks": None, "segsep": None, "error": str(e)}
-    segsep = 1 + sum(1 for t in toks if t in (";", "&&", "||"))
-    return {"cmd": cmd, "toks": toks, "segsep": segsep, "error": None}
+        return {"cmd": command, "toks": None, "segsep": None, "error": str(e)}
+    segment_separator = 1 + sum(1 for t in tokens if t in (";", "&&", "||"))
+    return {"cmd": command, "toks": tokens, "segsep": segment_separator, "error": None}
 
 
 def main():

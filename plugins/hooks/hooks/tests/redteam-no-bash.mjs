@@ -15,38 +15,39 @@ const HOOK = join(HERE, "..", "no-bash.mjs");
 
 let pass = 0;
 let fail = 0;
-const oneline = (s) => s.replace(/\n/g, "~").replace(/\t/g, ">");
+const oneline = (text) => text.replace(/\n/g, "~").replace(/\t/g, ">");
 
-function expect(want, reason, label, cmd) {
-  const payload = JSON.stringify({ tool_input: { command: cmd } });
-  const r = spawnSync(process.execPath, [HOOK], {
+function expect(want, reason, label, command) {
+  const payload = JSON.stringify({ tool_input: { command: command } });
+  const result = spawnSync(process.execPath, [HOOK], {
     input: payload,
     encoding: "utf8",
   });
-  if (r.error) {
+  if (result.error) {
     fail++;
-    console.log(`FAIL  [${label}] spawn error: ${r.error.message}`);
+    console.log(`FAIL  [${label}] spawn error: ${result.error.message}`);
     return;
   }
-  const status = r.status; // null if killed by a signal
+  const status = result.status; // null if killed by a signal
   const got =
     status === 2 ? "BLOCK" : status === 0 ? "ALLOW" : `EXIT(${status})`;
-  const m = (r.stderr || "").split("\n")[0].match(/reason=([a-z-]+)/);
+  const m = (result.stderr || "").split("\n")[0].match(/reason=([a-z-]+)/);
   const gotReason = m ? m[1] : "-";
   if (got === want && gotReason === reason) {
-    console.log(`PASS  [${label} ${want} ${gotReason}]  ${oneline(cmd)}`);
+    console.log(`PASS  [${label} ${want} ${gotReason}]  ${oneline(command)}`);
     pass++;
   } else {
     console.log(
-      `FAIL  [${label} want=${want}/${reason} got=${got}/${gotReason}]  ${oneline(cmd)}`,
+      `FAIL  [${label} want=${want}/${reason} got=${got}/${gotReason}]  ${oneline(command)}`,
     );
     fail++;
   }
 }
 
 console.log("=== Banned tools must BLOCK ===");
-for (const t of ["grep", "egrep", "fgrep", "rg"])
+for (const t of ["grep", "egrep", "fgrep", "rg"]) {
   expect("BLOCK", `bash-${t}`, `banned:${t}`, `${t} x f`);
+}
 expect("BLOCK", "bash-awk", "banned:awk", "awk x f");
 expect("BLOCK", "cat-read", "banned:cat", "cat f");
 expect("BLOCK", "bash-head", "banned:head", "head -5 f");

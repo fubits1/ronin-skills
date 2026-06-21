@@ -32,7 +32,7 @@ const ORACLE = join(HERE, "oracle.py");
 let pass = 0;
 let fail = 0;
 const fails = [];
-const ol = (s) => s.replace(/\n/g, "\\n");
+const oneline = (input) => input.replace(/\n/g, "\\n");
 function check(ok, label, detail) {
   if (ok) pass++;
   else {
@@ -42,9 +42,9 @@ function check(ok, label, detail) {
 }
 
 // hook verdict: "BLOCK"/"ALLOW" + reason tag
-function hook(cmd) {
-  const r = scan(cmd);
-  return { v: r ? "BLOCK" : "ALLOW", reason: r ? r.tag : null };
+function hook(command) {
+  const result = scan(command);
+  return { v: result ? "BLOCK" : "ALLOW", reason: result ? result.tag : null };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,8 +95,9 @@ for (const [t, reason] of Object.entries(SEARCH)) {
   add(`/usr/bin/${t} ${a}`, "BLOCK", reason, false, "abs-path");
   add(`FOO=bar ${t} ${a}`, "BLOCK", reason, false, "var-prefix");
   add(`(${t} ${a})`, "BLOCK", reason, false, "subshell");
-  for (const s of ["&&", "||", ";", "|"])
+  for (const s of ["&&", "||", ";", "|"]) {
     add(`echo hi ${s} ${t} ${a}`, "BLOCK", reason, true, `after ${s}`);
+  }
   // the single-quote-escape bug class: `'a\'` closes, then the tool is a real command
   add(`echo 'a\\' ; ${t} ${a}`, "BLOCK", reason, true, "sq-trailing-backslash");
   // inert: tool buried in a quote → not a command → ALLOW
@@ -159,8 +160,9 @@ for (const m of [
   "-C /r commit -m x",
   "-c k=v commit -m x",
   "--no-pager add .",
-])
+]) {
   add(`git ${m}`, "BLOCK", "git-mutation", false, `git mutate: ${m}`);
+}
 add("git grep foo", "BLOCK", "bash-grep", false, "git grep");
 for (const r of [
   "status",
@@ -187,8 +189,9 @@ for (const r of [
   "submodule status",
   "remote -v",
   "-C /r log",
-])
+]) {
   add(`git ${r}`, "ALLOW", null, false, `git read: ${r}`);
+}
 
 // 5) command builtin
 add("command grep x", "BLOCK", "command-builtin", false, "command exec bypass");
@@ -243,8 +246,9 @@ for (const c of [
   "jq .x f.json",
   "make build",
   "echo hi",
-])
+]) {
   add(c, "ALLOW", null, true, "legit single");
+}
 
 // 8) space-less operators — the hook splits on |/&&/||/; regardless of spacing; the oracle must too
 add("true|grep x", "BLOCK", "bash-grep", true, "spaceless pipe");
@@ -284,13 +288,17 @@ for (let i = 0; i < FUZZ_N; i++) {
   } else if (shape === 1) {
     // banned tool buried in a quote of echo → ALLOW (P2)
     const t = pick(SEARCH_TOOLS);
-    const q = pick(['"', "'"]);
-    fuzz.push({ cmd: `echo ${q}x ${t} ${ARG[t]}${q}`, inv: "P2-allow", t });
+    const quoteChar = pick(['"', "'"]);
+    fuzz.push({
+      cmd: `echo ${quoteChar}x ${t} ${ARG[t]}${quoteChar}`,
+      inv: "P2-allow",
+      t,
+    });
   } else if (shape === 2) {
     // two allowed commands joined by a separator → BLOCK chaining
-    const s = pick(SEPS);
+    const text = pick(SEPS);
     fuzz.push({
-      cmd: `${pick(ALLOWED_TOOLS)} a ${s} ${pick(ALLOWED_TOOLS)} b`,
+      cmd: `${pick(ALLOWED_TOOLS)} a ${text} ${pick(ALLOWED_TOOLS)} b`,
       inv: "P1-block",
     });
   } else if (shape === 3) {
@@ -325,8 +333,8 @@ if (py.status === 0 && py.stdout) {
   for (const line of py.stdout.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const o = JSON.parse(line);
-      oracleByCmd.set(o.cmd, o);
+      const parsed = JSON.parse(line);
+      oracleByCmd.set(parsed.cmd, parsed);
     } catch {
       /* ignore */
     }
@@ -343,18 +351,19 @@ if (py.status === 0 && py.stdout) {
 // disagree on space-less operators (`true|grep x` → ["true","|","grep","x"] → grep IS the 2nd
 // segment's first word → BLOCK, matching the hook).
 const BANNED_WORDS = new Set([...SEARCH_TOOLS, "cat"]);
-function oracleVerdict(o) {
-  if (!o || o.error || !o.toks) return null; // malformed / unparseable → can't oracle
-  const segs = [[]];
-  for (const t of o.toks) {
-    if (t === ";" || t === "&&" || t === "||" || t === "|" || t === "&")
-      segs.push([]);
-    else segs[segs.length - 1].push(t);
+function oracleVerdict(parsed) {
+  if (!parsed || parsed.error || !parsed.toks) return null; // malformed / unparseable → can't oracle
+  const segments = [[]];
+  for (const t of parsed.toks) {
+    if (t === ";" || t === "&&" || t === "||" || t === "|" || t === "&") {
+      segments.push([]);
+    } else segments[segments.length - 1].push(t);
   }
-  for (const seg of segs)
-    if (seg.length && BANNED_WORDS.has(seg[0])) return "BLOCK";
+  for (const segment of segments) {
+    if (segment.length && BANNED_WORDS.has(segment[0])) return "BLOCK";
+  }
   // chaining: count real commands split on ; && || only (pipe/& are not chaining)
-  if (o.segsep && o.segsep >= 2) return "BLOCK";
+  if (parsed.segsep && parsed.segsep >= 2) return "BLOCK";
   return "ALLOW";
 }
 
@@ -362,14 +371,14 @@ function oracleVerdict(o) {
 // Check A — labeled corpus
 // ---------------------------------------------------------------------------
 for (const c of cases) {
-  const h = hook(c.cmd);
-  const okV = h.v === c.expect;
+  const result = hook(c.cmd);
+  const okV = result.v === c.expect;
   const okR =
-    c.expect === "ALLOW" || c.reason === null || h.reason === c.reason;
+    c.expect === "ALLOW" || c.reason === null || result.reason === c.reason;
   check(
     okV && okR,
     `A:${c.note}`,
-    `want ${c.expect}${c.reason ? "/" + c.reason : ""} got ${h.v}${h.reason ? "/" + h.reason : ""}  ::  ${ol(c.cmd)}`,
+    `want ${c.expect}${c.reason ? "/" + c.reason : ""} got ${result.v}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
   );
 }
 
@@ -379,15 +388,15 @@ for (const c of cases) {
 let oracleChecked = 0;
 if (oracleByCmd) {
   for (const c of cases.filter((c) => c.oracleable)) {
-    const o = oracleByCmd.get(c.cmd);
-    const ov = oracleVerdict(o);
-    if (ov === null) continue;
+    const parsed = oracleByCmd.get(c.cmd);
+    const expected = oracleVerdict(parsed);
+    if (expected === null) continue;
     oracleChecked++;
-    const h = hook(c.cmd);
+    const result = hook(c.cmd);
     check(
-      h.v === ov,
+      result.v === expected,
       `B:${c.note}`,
-      `oracle says ${ov}, hook says ${h.v}${h.reason ? "/" + h.reason : ""}  ::  ${ol(c.cmd)}`,
+      `oracle says ${expected}, hook says ${result.v}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
     );
   }
 }
@@ -396,46 +405,50 @@ if (oracleByCmd) {
 // Check C — fuzz invariants
 // ---------------------------------------------------------------------------
 for (const f of fuzz) {
-  let h;
+  let result;
   try {
-    h = hook(f.cmd);
+    result = hook(f.cmd);
   } catch (e) {
-    check(false, `C:throw`, `scan threw: ${e.message}  ::  ${ol(f.cmd)}`);
+    check(false, `C:throw`, `scan threw: ${e.message}  ::  ${oneline(f.cmd)}`);
     continue;
   }
   // P3: verdict is always BLOCK or ALLOW
   check(
-    h.v === "BLOCK" || h.v === "ALLOW",
+    result.v === "BLOCK" || result.v === "ALLOW",
     `C:P3`,
-    `bad verdict ${h.v}  ::  ${ol(f.cmd)}`,
+    `bad verdict ${result.v}  ::  ${oneline(f.cmd)}`,
   );
-  if (f.inv === "P1-block")
+  if (f.inv === "P1-block") {
     check(
-      h.v === "BLOCK",
+      result.v === "BLOCK",
       `C:${f.inv}`,
-      `expected BLOCK got ${h.v}  ::  ${ol(f.cmd)}`,
+      `expected BLOCK got ${result.v}  ::  ${oneline(f.cmd)}`,
     );
-  if (f.inv === "P2-allow")
+  }
+  if (f.inv === "P2-allow") {
     check(
-      h.v === "ALLOW",
+      result.v === "ALLOW",
       `C:${f.inv}`,
-      `expected ALLOW got ${h.v}  ::  ${ol(f.cmd)}`,
+      `expected ALLOW got ${result.v}  ::  ${oneline(f.cmd)}`,
     );
-  if (f.inv === "P4-allow")
+  }
+  if (f.inv === "P4-allow") {
     check(
-      h.v === "ALLOW",
+      result.v === "ALLOW",
       `C:${f.inv}`,
-      `expected ALLOW got ${h.v}  ::  ${ol(f.cmd)}`,
+      `expected ALLOW got ${result.v}  ::  ${oneline(f.cmd)}`,
     );
+  }
   // cross-check fuzz against the oracle too (independent)
   if (oracleByCmd) {
-    const ov = oracleVerdict(oracleByCmd.get(f.cmd));
-    if (ov !== null)
+    const expected = oracleVerdict(oracleByCmd.get(f.cmd));
+    if (expected !== null) {
       check(
-        h.v === ov,
+        result.v === expected,
         `C:oracle`,
-        `oracle ${ov} vs hook ${h.v}  ::  ${ol(f.cmd)}`,
+        `oracle ${expected} vs hook ${result.v}  ::  ${oneline(f.cmd)}`,
       );
+    }
   }
 }
 

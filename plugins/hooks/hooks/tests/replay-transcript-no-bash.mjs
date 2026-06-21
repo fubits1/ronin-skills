@@ -27,18 +27,19 @@ function jsonlFiles(p) {
   } catch {
     return [];
   }
-  if (st.isDirectory())
+  if (st.isDirectory()) {
     return readdirSync(p)
       .filter((f) => f.endsWith(".jsonl"))
       .map((f) => join(p, f));
+  }
   return p.endsWith(".jsonl") ? [p] : [];
 }
 
 // recursively collect every Bash tool_use command in a parsed transcript record
-function collectBash(node, out) {
+function collectBash(node, output) {
   if (!node || typeof node !== "object") return;
   if (Array.isArray(node)) {
-    for (const x of node) collectBash(x, out);
+    for (const x of node) collectBash(x, output);
     return;
   }
   if (
@@ -47,9 +48,9 @@ function collectBash(node, out) {
     node.input &&
     typeof node.input.command === "string"
   ) {
-    out.add(node.input.command);
+    output.add(node.input.command);
   }
-  for (const k of Object.keys(node)) collectBash(node[k], out);
+  for (const k of Object.keys(node)) collectBash(node[k], output);
 }
 
 const files = targets.flatMap(jsonlFiles);
@@ -58,20 +59,20 @@ if (!files.length) {
   process.exit(0);
 }
 
-const cmds = new Set();
+const commands = new Set();
 let lines = 0;
 for (const f of files) {
-  let txt;
+  let text;
   try {
-    txt = readFileSync(f, "utf8");
+    text = readFileSync(f, "utf8");
   } catch {
     continue;
   }
-  for (const line of txt.split("\n")) {
+  for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     lines++;
     try {
-      collectBash(JSON.parse(line), cmds);
+      collectBash(JSON.parse(line), commands);
     } catch {
       /* skip non-JSON / partial lines */
     }
@@ -80,30 +81,32 @@ for (const f of files) {
 
 const byReason = new Map();
 let allowed = 0;
-for (const c of cmds) {
-  let r;
+for (const command of commands) {
+  let result;
   try {
-    r = scan(c);
+    result = scan(command);
   } catch (e) {
-    r = { tag: "THREW:" + e.message };
+    result = { tag: "THREW:" + e.message };
   }
-  if (!r) {
+  if (!result) {
     allowed++;
     continue;
   }
-  if (!byReason.has(r.tag)) byReason.set(r.tag, []);
-  byReason.get(r.tag).push(c);
+  if (!byReason.has(result.tag)) byReason.set(result.tag, []);
+  byReason.get(result.tag).push(command);
 }
 
-const ol = (s) => s.replace(/\n/g, "\\n");
+const oneline = (input) => input.replace(/\n/g, "\\n");
 console.log(
-  `Replayed ${cmds.size} distinct Bash commands from ${files.length} transcript(s) (${lines} lines).`,
+  `Replayed ${commands.size} distinct Bash commands from ${files.length} transcript(s) (${lines} lines).`,
 );
-console.log(`  ALLOW: ${allowed}    BLOCK: ${cmds.size - allowed}\n`);
+console.log(`  ALLOW: ${allowed}    BLOCK: ${commands.size - allowed}\n`);
 const order = [...byReason.entries()].sort((a, b) => b[1].length - a[1].length);
 for (const [reason, list] of order) {
   console.log(`reason=${reason}  (${list.length})`);
-  for (const c of list.slice(0, 12)) console.log(`    ${ol(c).slice(0, 160)}`);
+  for (const command of list.slice(0, 12)) {
+    console.log(`    ${oneline(command).slice(0, 160)}`);
+  }
   if (list.length > 12) console.log(`    … and ${list.length - 12} more`);
   console.log("");
 }

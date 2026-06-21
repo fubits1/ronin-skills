@@ -105,18 +105,18 @@ const MSG = {
   chaining:
     "No command chaining. You joined multiple commands with && / || / ; in one Bash call. Run each as a SEPARATE Bash call instead. Chaining hides later commands from per-command approval and is a documented permission-bypass vector. (The working directory persists across Bash calls, so 'cd dir && cmd' is unnecessary too. Pipes into jq and redirections like 2>&1 are fine.)",
 };
-function blk(tag, msg) {
-  return { tag, msg: msg || MSG[tag] };
+function block(tag, message) {
+  return { tag, msg: message || MSG[tag] };
 }
-function grepMsg(tool) {
+function grepMessage(tool) {
   return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset.`;
 }
-function readMsg(tool) {
+function readMessage(tool) {
   return `Use the Read tool instead of Bash ${tool}. Read supports: offset (start line), limit (number of lines).`;
 }
 
-function firstToken(s) {
-  const m = s.replace(/^\s+/, "").match(/^\S+/);
+function firstToken(text) {
+  const m = text.replace(/^\s+/, "").match(/^\S+/);
   return m ? m[0] : "";
 }
 function stripBackslashAndPath(w) {
@@ -124,20 +124,20 @@ function stripBackslashAndPath(w) {
   if (f.includes("/")) f = f.split("/").pop(); // basename
   return f;
 }
-function normalizeFirst(cmdIn) {
-  let cmd = cmdIn.replace(/^\s+/, ""); // ltrim
-  while (cmd[0] === "(" || cmd[0] === "{") {
-    cmd = cmd.slice(1).replace(/^\s+/, ""); // strip leading group-openers
+function normalizeFirst(commandIn) {
+  let command = commandIn.replace(/^\s+/, ""); // ltrim
+  while (command[0] === "(" || command[0] === "{") {
+    command = command.slice(1).replace(/^\s+/, ""); // strip leading group-openers
   }
-  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(cmd)) {
-    cmd = cmd.replace(/^[A-Za-z_][A-Za-z0-9_]*=\S*\s*/, ""); // strip VAR=value prefixes
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(command)) {
+    command = command.replace(/^[A-Za-z_][A-Za-z0-9_]*=\S*\s*/, ""); // strip VAR=value prefixes
   }
-  let first = stripBackslashAndPath(firstToken(cmd));
+  let first = stripBackslashAndPath(firstToken(command));
   // Unwrap process wrappers (timeout 5 nice -n 10 grep). Cap 8; on overflow, fall through (a bare
   // wrapper or pathological stacking is not the model's reflex this hook targets).
   let i = 0;
   while (i < 8 && WRAPPERS.has(first)) {
-    let rest = cmd.replace(new RegExp("^\\s*" + first + "(\\s+|$)"), "");
+    let rest = command.replace(new RegExp("^\\s*" + first + "(\\s+|$)"), "");
     // strip wrapper flags / numerics, plus the `{}` replstr of `xargs -I {}` (the dominant xargs
     // idiom — `-I` is consumed as a flag, then `{}` would otherwise become the effective first token)
     while (/^\s*(-|[0-9]|\{\})/.test(rest)) {
@@ -146,7 +146,7 @@ function normalizeFirst(cmdIn) {
     while (/^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(rest)) {
       rest = rest.replace(/^\s*[A-Za-z_][A-Za-z0-9_]*=\S*\s*/, "");
     }
-    cmd = rest;
+    command = rest;
     first = stripBackslashAndPath(firstToken(rest));
     i++;
   }
@@ -163,49 +163,54 @@ function chainCount(command) {
   // LINEAR: it runs only on multi-line input, and only when there are FEW heredoc openers. A real
   // command has one or two; a `<<X\n<<X…` token flood (not a model reflex; each non-terminating
   // opener would otherwise rescan to end → O(n²)) is skipped and simply counts as chaining.
-  let s = command;
-  if (s.includes("\n") && (s.match(/<</g) || []).length <= 4) {
-    s = s.replace(/<<-?\s*["']?([A-Za-z_]\w*)["']?[\s\S]*?\n[ \t]*\1\b/g, " ");
+  let text = command;
+  if (text.includes("\n") && (text.match(/<</g) || []).length <= 4) {
+    text = text.replace(
+      /<<-?\s*["']?([A-Za-z_]\w*)["']?[\s\S]*?\n[ \t]*\1\b/g,
+      " ",
+    );
   }
-  s = s.replace(/\\\n/g, " "); // join `\`-newline line-continuations into one logical line
-  let out = "";
-  let q = null;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "\\" && q !== "'") {
+  text = text.replace(/\\\n/g, " "); // join `\`-newline line-continuations into one logical line
+  let output = "";
+  let quoteChar = null;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === "\\" && quoteChar !== "'") {
       i++; // an escaped char is inert (e.g. \" never toggles a quote) — but bash does NOT process
       continue; // backslash inside single quotes, so don't treat it as an escape there
     }
-    if (q) {
-      if (c === q) q = null; // inside a quote: drop everything (incl. ; && and newlines)
+    if (quoteChar) {
+      if (char === quoteChar) quoteChar = null; // inside a quote: drop everything (incl. ; && and newlines)
       continue;
     }
-    if (c === '"' || c === "'") {
-      q = c;
+    if (char === '"' || char === "'") {
+      quoteChar = char;
       continue;
     }
-    out += c;
+    output += char;
   }
-  const segs = out.replace(/(&&|\|\||;)/g, "\n").split("\n");
-  let n = 0;
-  for (const seg of segs) if (seg.replace(/\s/g, "") !== "") n++;
-  return n;
+  const segments = output.replace(/(&&|\|\||;)/g, "\n").split("\n");
+  let count = 0;
+  for (const segment of segments) {
+    if (segment.replace(/\s/g, "") !== "") count++;
+  }
+  return count;
 }
 
 // Is this `git …` segment a MUTATION (block) or a read-only/inspection form (pass)? The hook's
 // contract (no-bash.md): mutating git blocks while read-only git and `git mv` pass. Every subcommand
 // with a common read-only form is discriminated — mirroring how `remote` already was — so reads like
 // `git stash list`, `git tag -l`, `git config --get`, `git clean -n`, `git apply --check` pass.
-function gitMutates(seg) {
-  let rest = seg.replace(/^[^A-Za-z]*git\s+/, ""); // drop leading `git ` (and any indent/operator)
+function gitMutates(segment) {
+  let rest = segment.replace(/^[^A-Za-z]*git\s+/, ""); // drop leading `git ` (and any indent/operator)
   let prev;
   do {
     prev = rest;
     rest = rest.replace(GIT_GLOBAL, ""); // strip global options before the subcommand
   } while (rest !== prev);
-  const sc = (rest.match(/^\S+/) || [""])[0];
-  const args = rest.slice(sc.length); // leading-space-prefixed remainder after the subcommand
-  switch (sc) {
+  const subcommand = (rest.match(/^\S+/) || [""])[0];
+  const args = rest.slice(subcommand.length); // leading-space-prefixed remainder after the subcommand
+  switch (subcommand) {
     // unconditional mutations (no common read-only form)
     case "add":
     case "commit":
@@ -261,54 +266,55 @@ function gitMutates(seg) {
 
 // Quote-aware segment split: operators (&& || ; | &) and newlines OUTSIDE quotes only, so
 // `echo "a; cat b"` is ONE segment (no false block on a banned word inside a quoted argument).
-function splitSegments(s) {
-  const out = [];
-  let cur = "";
-  let q = null;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "\\" && q !== "'") {
+function splitSegments(text) {
+  const output = [];
+  let current = "";
+  let quoteChar = null;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === "\\" && quoteChar !== "'") {
       // an escaped char is literal, never structural: keep both, so `\"` doesn't toggle a quote and
       // `\;`/`\&`/`\|` don't split a segment (mirrors chainCount). Bash does NOT process backslash
       // inside single quotes, so don't treat it as an escape there (else a `'…\'` keeps the quote open).
-      cur += c;
-      if (i + 1 < s.length) cur += s[++i];
+      current += char;
+      if (i + 1 < text.length) current += text[++i];
       continue;
     }
-    if (q) {
-      cur += c;
-      if (c === q) q = null;
+    if (quoteChar) {
+      current += char;
+      if (char === quoteChar) quoteChar = null;
       continue;
     }
-    if (c === '"' || c === "'") {
-      q = c;
-      cur += c;
-    } else if (c === "\n" || c === ";") {
-      out.push(cur);
-      cur = "";
-    } else if (c === "&" || c === "|") {
-      out.push(cur);
-      cur = "";
-      if (s[i + 1] === c) i++;
+    if (char === '"' || char === "'") {
+      quoteChar = char;
+      current += char;
+    } else if (char === "\n" || char === ";") {
+      output.push(current);
+      current = "";
+    } else if (char === "&" || char === "|") {
+      output.push(current);
+      current = "";
+      if (text[i + 1] === char) i++;
     } else {
-      cur += c;
+      current += char;
     }
   }
-  out.push(cur);
-  return out;
+  output.push(current);
+  return output;
 }
 
 export function scan(command) {
   if (typeof command !== "string" || command === "") return null;
 
-  if (RE_NODE_SHELLOUT.test(command)) return blk("node-shellout");
-  if (RE_PY_SHELLOUT.test(command)) return blk("python-shellout");
-  if (RE_BASHC_BANNED.test(command)) return blk("bashc-banned");
-  if (RE_BASHC_SED_N.test(command) || RE_BASHC_SED_NP.test(command))
-    return blk("bashc-sed-read");
-  if (RE_DOLLAR_SUB.test(command)) return blk("dollar-sub");
-  if (RE_BACKTICK_SUB.test(command)) return blk("backtick-sub");
-  if (RE_PROCSUB.test(command)) return blk("procsub");
+  if (RE_NODE_SHELLOUT.test(command)) return block("node-shellout");
+  if (RE_PY_SHELLOUT.test(command)) return block("python-shellout");
+  if (RE_BASHC_BANNED.test(command)) return block("bashc-banned");
+  if (RE_BASHC_SED_N.test(command) || RE_BASHC_SED_NP.test(command)) {
+    return block("bashc-sed-read");
+  }
+  if (RE_DOLLAR_SUB.test(command)) return block("dollar-sub");
+  if (RE_BACKTICK_SUB.test(command)) return block("backtick-sub");
+  if (RE_PROCSUB.test(command)) return block("procsub");
 
   for (const SUB of splitSegments(command)) {
     if (SUB.replace(/ /g, "") === "") continue;
@@ -316,12 +322,13 @@ export function scan(command) {
     if (FIRST === "ls") continue;
     if (FIRST === "command") {
       if (/^\s*command\s+-[vV]\b/.test(SUB)) continue; // existence check, not tool execution
-      return blk("command-builtin");
+      return block("command-builtin");
     }
     if (FIRST === "git") {
-      if (/^\s*git\s+grep\b/.test(SUB))
-        return blk("bash-grep", grepMsg("git grep")); // content search → Grep
-      if (gitMutates(SUB)) return blk("git-mutation");
+      if (/^\s*git\s+grep\b/.test(SUB)) {
+        return block("bash-grep", grepMessage("git grep")); // content search → Grep
+      }
+      if (gitMutates(SUB)) return block("git-mutation");
       continue;
     }
     if (
@@ -329,28 +336,30 @@ export function scan(command) {
       FIRST === "egrep" ||
       FIRST === "fgrep" ||
       FIRST === "rg"
-    )
-      return blk("bash-" + FIRST, grepMsg(FIRST));
+    ) {
+      return block("bash-" + FIRST, grepMessage(FIRST));
+    }
     if (FIRST === "cat") {
       // route to Write only for a genuine stdout file-write or heredoc; a stderr redirect
       // (`2>/dev/null`, `2>&1`, `1>&2`) or a here-string (`<<<`) is still a READ → cat-read
       const heredoc = /(?<!<)<<(?!<)/.test(SUB); // exactly two `<` (heredoc), not `<<<` (here-string)
       const stdoutWrite = /(^|[^0-9&<])1?>>?\s*[^&\s]/.test(SUB);
-      return heredoc || stdoutWrite ? blk("cat-write") : blk("cat-read");
+      return heredoc || stdoutWrite ? block("cat-write") : block("cat-read");
     }
-    if (FIRST === "head" || FIRST === "tail")
-      return blk("bash-" + FIRST, readMsg(FIRST));
-    if (FIRST === "find") return blk("bash-find");
+    if (FIRST === "head" || FIRST === "tail") {
+      return block("bash-" + FIRST, readMessage(FIRST));
+    }
+    if (FIRST === "find") return block("bash-find");
     if (FIRST === "sed") {
-      if (RE_SED_N.test(SUB) || RE_SED_NP.test(SUB)) return blk("sed-read");
+      if (RE_SED_N.test(SUB) || RE_SED_NP.test(SUB)) return block("sed-read");
       continue;
     }
-    if (FIRST === "awk") return blk("bash-awk");
-    if (FIRST === "wc") return blk("bash-wc");
+    if (FIRST === "awk") return block("bash-awk");
+    if (FIRST === "wc") return block("bash-wc");
   }
 
   // No-chaining check (runs after the per-tool arms, so a banned-tool message wins).
-  if (chainCount(command) > 1) return blk("chaining");
+  if (chainCount(command) > 1) return block("chaining");
   return null;
 }
 

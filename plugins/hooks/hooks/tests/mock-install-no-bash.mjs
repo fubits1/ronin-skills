@@ -22,11 +22,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, ".."); // plugins/hooks/hooks
 // Find the no-bash PreToolUse command BEFORE creating any temp dir (so an early exit can't leak it).
 const hooksJson = JSON.parse(readFileSync(join(SRC, "hooks.json"), "utf8"));
-let tmpl = null;
-for (const entry of hooksJson.hooks.PreToolUse || [])
-  for (const h of entry.hooks || [])
-    if (h.command && h.command.includes("no-bash")) tmpl = h.command;
-if (!tmpl) {
+let template = null;
+for (const entry of hooksJson.hooks.PreToolUse || []) {
+  for (const result of entry.hooks || []) {
+    if (result.command && result.command.includes("no-bash")) {
+      template = result.command;
+    }
+  }
+}
+if (!template) {
   console.error("FATAL: no no-bash PreToolUse command found in hooks.json");
   process.exit(1);
 }
@@ -55,20 +59,23 @@ try {
   }
 
   // Substitute ${CLAUDE_PLUGIN_ROOT} → the spaced root, exactly as Claude Code does.
-  const cmd = tmpl.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root);
+  const command = template.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root);
   // Parse `node <path>` WITHOUT splitting on spaces (the path contains a space): program = up to the
   // first space, the rest is ONE argv element. This is what proves the spaced path survives.
-  const sp = cmd.indexOf(" ");
-  const prog = cmd.slice(0, sp);
-  const arg = cmd.slice(sp + 1);
-  const exe = prog === "node" ? process.execPath : prog;
+  const spaceIndex = command.indexOf(" ");
+  const program = command.slice(0, spaceIndex);
+  const argument = command.slice(spaceIndex + 1);
+  const executable = program === "node" ? process.execPath : program;
 
   function invoke(command) {
-    const r = spawnSync(exe, [arg], {
+    const result = spawnSync(executable, [argument], {
       input: JSON.stringify({ tool_input: { command } }),
       encoding: "utf8",
     });
-    return { code: r.status === null ? -2 : r.status, stderr: r.stderr || "" };
+    return {
+      code: result.status === null ? -2 : result.status,
+      stderr: result.stderr || "",
+    };
   }
 
   // A banned tool blocks (exit 2) and names the right tool — through the spaced-path wiring.

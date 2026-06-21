@@ -13,17 +13,17 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "no-bash.mjs");
 
-function medianMs(cmd, n) {
-  const payload = JSON.stringify({ tool_input: { command: cmd } });
-  const t = [];
-  for (let i = 0; i < n; i++) {
-    const a = process.hrtime.bigint();
+function medianMs(command, count) {
+  const payload = JSON.stringify({ tool_input: { command: command } });
+  const timings = [];
+  for (let i = 0; i < count; i++) {
+    const startTime = process.hrtime.bigint();
     spawnSync(process.execPath, [HOOK], { input: payload, encoding: "utf8" });
-    const b = process.hrtime.bigint();
-    t.push(Number(b - a) / 1e6);
+    const endTime = process.hrtime.bigint();
+    timings.push(Number(endTime - startTime) / 1e6);
   }
-  t.sort((x, y) => x - y);
-  return t[Math.floor(n / 2)];
+  timings.sort((x, y) => x - y);
+  return timings[Math.floor(count / 2)];
 }
 
 const N = 31;
@@ -34,14 +34,14 @@ console.log(
 console.log(
   `  baseline (cold start + 'ls' allow)   : ${baseline.toFixed(1)} ms`,
 );
-for (const [label, cmd] of [
+for (const [label, command] of [
   ["typical block (cat x)", "cat x"],
   ["chaining", "pnpm build && pnpm test"],
   ["bash -c (nested wrappers)", 'bash -c "env timeout grep x"'],
   ["quoted bypass ('grep' x)", "'grep' x"],
   ["quoted arg w/ ops", 'echo "step 1; cat results"'],
 ]) {
-  console.log(`  ${label.padEnd(36)} : ${medianMs(cmd, N).toFixed(1)} ms`);
+  console.log(`  ${label.padEnd(36)} : ${medianMs(command, N).toFixed(1)} ms`);
 }
 
 console.log(
@@ -66,11 +66,11 @@ const big = [
   ],
 ];
 let worst = 0;
-for (const [label, cmd] of big) {
-  const total = medianMs(cmd, 5);
+for (const [label, command] of big) {
+  const total = medianMs(command, 5);
   worst = Math.max(worst, total);
   console.log(
-    `  ${label.padEnd(26)} (${String(cmd.length).padStart(7)} chars): ${total.toFixed(1).padStart(7)} ms total  (~${(total - baseline).toFixed(1)} ms algo)`,
+    `  ${label.padEnd(26)} (${String(command.length).padStart(7)} chars): ${total.toFixed(1).padStart(7)} ms total  (~${(total - baseline).toFixed(1)} ms algo)`,
   );
 }
 console.log(

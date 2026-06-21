@@ -119,8 +119,9 @@ function main() {
     if (!isAssistant(e)) continue;
     const c = e?.message?.content;
     if (Array.isArray(c)) {
-      for (const b of c)
+      for (const b of c) {
         if (b?.type === "text" && b.text) text += b.text + "\n";
+      }
     }
   }
   if (!text) process.exit(0);

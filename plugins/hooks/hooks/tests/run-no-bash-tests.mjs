@@ -11,9 +11,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "no-bash.mjs");
 let pass = 0;
 let fail = 0;
-const oneline = (s) => s.replace(/\n/g, "\\n");
-function run(cmd) {
-  const payload = JSON.stringify({ tool_input: { command: cmd } });
+const oneline = (text) => text.replace(/\n/g, "\\n");
+function run(command) {
+  const payload = JSON.stringify({ tool_input: { command } });
   const r = spawnSync(process.execPath, [HOOK], {
     input: payload,
     encoding: "utf8",
@@ -25,56 +25,56 @@ function run(cmd) {
 const BLOCK = 2;
 const ALLOW = 0;
 // exit-code assertion
-function runCase(expected, label, cmd) {
-  const { code } = run(cmd);
+function runCase(expected, label, command) {
+  const { code } = run(command);
   if (code === expected) {
     console.log(
-      `PASS  [${label} exit=${code === BLOCK ? "BLOCK" : code === ALLOW ? "ALLOW" : code}]  ${oneline(cmd)}`,
+      `PASS  [${label} exit=${code === BLOCK ? "BLOCK" : code === ALLOW ? "ALLOW" : code}]  ${oneline(command)}`,
     );
     pass++;
   } else {
     console.log(
-      `FAIL  [${label} want=${expected} got=${code}]  ${oneline(cmd)}`,
+      `FAIL  [${label} want=${expected} got=${code}]  ${oneline(command)}`,
     );
     fail++;
   }
 }
 // BLOCK + the teaching message must contain `substr` (proves the right tool is named back)
-function runMsg(label, cmd, substr) {
-  const { code, stderr } = run(cmd);
+function runMessage(label, command, substr) {
+  const { code, stderr } = run(command);
   if (code === BLOCK && stderr.includes(substr)) {
-    console.log(`PASS  [${label} msg~"${substr}"]  ${oneline(cmd)}`);
+    console.log(`PASS  [${label} msg~"${substr}"]  ${oneline(command)}`);
     pass++;
   } else {
     console.log(
-      `FAIL  [${label} want=BLOCK&msg~"${substr}" got=${code} stderr="${oneline(stderr).slice(0, 70)}"]  ${oneline(cmd)}`,
+      `FAIL  [${label} want=BLOCK&msg~"${substr}" got=${code} stderr="${oneline(stderr).slice(0, 70)}"]  ${oneline(command)}`,
     );
     fail++;
   }
 }
 
 console.log("=== Banned tools BLOCK and name the right dedicated tool ===");
-runMsg("grep", "grep foo file", "Use the Grep tool");
-runMsg("egrep", "egrep foo file", "Use the Grep tool");
-runMsg("rg", "rg foo file", "Use the Grep tool");
-runMsg("cat-read", "cat file", "Use the Read tool");
-runMsg("head", "head -20 file", "Use the Read tool");
-runMsg("tail", "tail -20 file", "Use the Read tool");
-runMsg("find", "find . -name '*.ts'", "Use the Glob tool");
-runMsg("sed-read", "sed -n 10,20p file", "Use the Read tool");
-runMsg("awk", "awk '{print $1}' file", "awk");
-runMsg("wc", "wc -l file", "output_mode");
+runMessage("grep", "grep foo file", "Use the Grep tool");
+runMessage("egrep", "egrep foo file", "Use the Grep tool");
+runMessage("rg", "rg foo file", "Use the Grep tool");
+runMessage("cat-read", "cat file", "Use the Read tool");
+runMessage("head", "head -20 file", "Use the Read tool");
+runMessage("tail", "tail -20 file", "Use the Read tool");
+runMessage("find", "find . -name '*.ts'", "Use the Glob tool");
+runMessage("sed-read", "sed -n 10,20p file", "Use the Read tool");
+runMessage("awk", "awk '{print $1}' file", "awk");
+runMessage("wc", "wc -l file", "output_mode");
 
 console.log("\n=== cat write-vs-read routing (the redirect fix) ===");
-runMsg("cat-stdout-write", "cat foo > out.txt", "Use the Write tool");
-runMsg("cat-append", "cat a >> b.txt", "Use the Write tool");
-runMsg("cat-heredoc", "cat > f <<EOF\nx\nEOF", "Use the Write tool");
-runMsg("cat-stderr-read", "cat foo 2>/dev/null", "Use the Read tool"); // stderr redirect = READ
-runMsg("cat-2to1-read", "cat foo 2>&1", "Use the Read tool");
-runMsg("cat-herestring-read", "cat <<< 'x'", "Use the Read tool"); // <<< here-string = READ
+runMessage("cat-stdout-write", "cat foo > out.txt", "Use the Write tool");
+runMessage("cat-append", "cat a >> b.txt", "Use the Write tool");
+runMessage("cat-heredoc", "cat > f <<EOF\nx\nEOF", "Use the Write tool");
+runMessage("cat-stderr-read", "cat foo 2>/dev/null", "Use the Read tool"); // stderr redirect = READ
+runMessage("cat-2to1-read", "cat foo 2>&1", "Use the Read tool");
+runMessage("cat-herestring-read", "cat <<< 'x'", "Use the Read tool"); // <<< here-string = READ
 
 console.log("\n=== git: mutating BLOCKS, read-only/inspection PASSES ===");
-runMsg("git-commit", "git commit -m x", "Mutating git");
+runMessage("git-commit", "git commit -m x", "Mutating git");
 runCase(BLOCK, "git-push", "git push origin main");
 runCase(BLOCK, "git-reset-hard", "git reset --hard HEAD~1");
 runCase(BLOCK, "git-C-commit", "git -C /repo commit -m x"); // global option before subcommand
@@ -82,7 +82,7 @@ runCase(BLOCK, "git-stash", "git stash");
 runCase(BLOCK, "git-clean-force", "git clean -fd");
 runCase(BLOCK, "git-branch-del", "git branch -D feature");
 runCase(BLOCK, "git-worktree-add", "git worktree add ../wt main");
-runMsg("git-grep", "git grep foo", "Use the Grep tool");
+runMessage("git-grep", "git grep foo", "Use the Grep tool");
 runCase(ALLOW, "git-status", "git status");
 runCase(ALLOW, "git-log", "git log --oneline -n 5");
 runCase(ALLOW, "git-mv", "git mv a b");
@@ -102,7 +102,7 @@ runCase(BLOCK, "xargs-I-grep", "xargs -I {} grep foo {}");
 runCase(BLOCK, "dollar-sub", "echo $(grep foo f)");
 runCase(BLOCK, "backtick-sub", "echo `cat f`");
 runCase(BLOCK, "procsub", "diff <(cat a) <(cat b)");
-runMsg("bashc", 'bash -c "grep foo f"', "bash -c");
+runMessage("bashc", 'bash -c "grep foo f"', "bash -c");
 runCase(BLOCK, "bashc-login", 'bash -lc "cat f"');
 runCase(
   BLOCK,
@@ -115,7 +115,7 @@ runCase(ALLOW, "command-v", "command -v node");
 console.log(
   "\n=== chaining BLOCKS; one logical command (quoted/continued/heredoc) PASSES ===",
 );
-runMsg("chain-and", "pnpm build && pnpm test", "No command chaining");
+runMessage("chain-and", "pnpm build && pnpm test", "No command chaining");
 runCase(BLOCK, "chain-semi", "echo a ; echo b");
 runCase(BLOCK, "chain-or", "true || echo no");
 runCase(BLOCK, "multiline-block", "dex a\ndex b\ndex c");
