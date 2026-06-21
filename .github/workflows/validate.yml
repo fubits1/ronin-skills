@@ -63,4 +63,4 @@ jobs:
       - name: protocol-conformance + fail-open harness (all hooks, full stdin envelope)
         run: node plugins/hooks/hooks/tests/conformance-hooks.mjs
       - name: Run no-honest hook tests
-        run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh
+        run: node plugins/hooks/hooks/tests/run-no-honest-tests.mjs
