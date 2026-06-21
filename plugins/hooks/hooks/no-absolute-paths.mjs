@@ -11,6 +11,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { sep } from "node:path";
 
 // Returns { message } if the command references the project root in absolute, `~`, or `$HOME` form;
 // else null. root/homeDir are passed in so the logic is pure and testable. Literal substring match
@@ -30,10 +31,12 @@ export function checkAbsolutePaths(command, root, homeDir) {
     if (root === homeDir) {
       tildeRoot = "~";
       dollarHomeRoot = "$HOME";
-    } else if (root.startsWith(homeDir + "/")) {
-      const relative = root.slice(homeDir.length + 1);
-      tildeRoot = "~/" + relative;
-      dollarHomeRoot = "$HOME/" + relative;
+    } else if (root.startsWith(homeDir + sep)) {
+      // use path.sep, not a hardcoded "/", so this works on Windows (`\`) too, where the hook now
+      // runs. On Unix sep === "/", so this is byte-identical to the old behavior.
+      const relative = root.slice(homeDir.length + sep.length);
+      tildeRoot = "~" + sep + relative;
+      dollarHomeRoot = "$HOME" + sep + relative;
     }
   }
   if (tildeRoot && command.includes(tildeRoot)) {

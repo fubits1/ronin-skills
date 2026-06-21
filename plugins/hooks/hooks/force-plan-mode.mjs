@@ -17,7 +17,7 @@ const DIRECTIVE =
 // original used `[[:punct:]]` after plan-this/it/that) — `[^\w\s]` is NOT equivalent (it excludes `_`,
 // which is punct, and includes non-ASCII/control chars, which are not), so use the explicit ranges.
 const RE_PLAN =
-  /(^|\s)\/plan(\s|$)|(^|\s)plan\s+(this|it|that)(\s|[!-/:-@[-`{-~]|$)|(make|draft|write)\s+a\s+plan/i;
+  /(^|\s)\/plan(\s|$)|(^|\s)plan\s+(this|it|that)(\s|[!-/:-@[-`{-~]|$)|\b(make|draft|write)\s+a\s+plan\b/i;
 
 // Returns the additionalContext directive object if the prompt asks for a plan, else null.
 export function planDirective(prompt) {

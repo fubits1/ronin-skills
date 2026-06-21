@@ -111,6 +111,20 @@ ok(planDirective("plan this") !== null, "plan this → directive");
 ok(planDirective("plan it.") !== null, "plan it. → directive");
 ok(planDirective("make a plan") !== null, "make a plan → directive");
 ok(planDirective("draft a plan for x") !== null, "draft a plan → directive");
+// word boundaries on the make/draft/write-a-plan branch (tighter than the old .sh, which matched
+// these as substrings): "make"/"plan" must be standalone words.
+ok(
+  planDirective("please make a plan") !== null,
+  "make a plan after a word → directive",
+);
+ok(
+  planDirective("remake a planet") === null,
+  "remake a planet (substring) → null",
+);
+ok(
+  planDirective("make a planner now") === null,
+  "make a planner (substring) → null",
+);
 ok(planDirective("planning the trip") === null, "planning → no false positive");
 ok(planDirective("explain this") === null, "explain this → no false positive");
 ok(planDirective("just do it") === null, "unrelated → null");

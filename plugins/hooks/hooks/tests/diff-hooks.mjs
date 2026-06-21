@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // EQUIVALENCE differential: prove each Node-ported hook behaves IDENTICALLY to the bash original it
 // replaced. Ground truth is the OLD `.sh` (the spec the user already ran), NOT the author's
-// enumeration. Restores the old `.sh` from git (HEAD), runs BOTH old + new over a large generated +
-// fuzzed corpus, and diffs the observable behavior (exit code, and semantic output / formatter
-// decision). Any divergence is a port bug. Ad-hoc gate — needs bash, jq, and git.
+// enumeration. Restores the old `.sh` from git, runs BOTH old + new over a large generated + fuzzed
+// corpus, and diffs the observable behavior (exit code, and semantic output / formatter decision).
+// Any divergence is a port bug. Ad-hoc gate — needs bash, jq, and git.
 //
 //   node plugins/hooks/hooks/tests/diff-hooks.mjs [seed]
 //
@@ -25,13 +25,13 @@ import { tmpdir } from "node:os";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // the new .mjs live one dir up; DIFF_HOOKS_DIR overrides it (used to prove the diff has teeth against
-// a deliberately-broken copy). The old .sh always come from git HEAD — the real spec.
+// a deliberately-broken copy). The old .sh always come from git — the real spec.
 const HOOKS = process.env.DIFF_HOOKS_DIR || join(HERE, "..");
 
 let pass = 0;
 let fail = 0;
 const divergences = [];
-const oneline = (s) => String(s).replace(/\n/g, "\\n");
+const oneline = (value) => String(value).replace(/\n/g, "\\n");
 function compare(label, input, oldResult, newResult) {
   if (oldResult === newResult) {
     pass++;
@@ -43,46 +43,58 @@ function compare(label, input, oldResult, newResult) {
   }
 }
 
-// --- restore old .sh from git (HEAD) into a temp dir ---
+// --- restore old .sh from git into a temp dir ---
 const work = mkdtempSync(join(tmpdir(), "diff-hooks-"));
 function gitShow(path) {
-  const r = spawnSync("git", ["show", "HEAD:" + path], { encoding: "utf8" });
-  return r.status === 0 ? r.stdout : null;
+  // try HEAD first; once the .sh are migrated away (deleted), fall back to the last commit that had
+  // them — `git rev-list -1 HEAD -- <path>` is the commit that last touched the path (the deletion if
+  // deleted), so its parent `~1` holds the content. Keeps this differential durable past the commit.
+  let shown = spawnSync("git", ["show", "HEAD:" + path], { encoding: "utf8" });
+  if (shown.status === 0) return shown.stdout;
+  const lastTouch = spawnSync("git", ["rev-list", "-1", "HEAD", "--", path], {
+    encoding: "utf8",
+  });
+  const sha = (lastTouch.stdout || "").trim();
+  if (!sha) return null;
+  shown = spawnSync("git", ["show", sha + "~1:" + path], { encoding: "utf8" });
+  if (shown.status === 0) return shown.stdout;
+  shown = spawnSync("git", ["show", sha + ":" + path], { encoding: "utf8" });
+  return shown.status === 0 ? shown.stdout : null;
 }
 function restoreSh(name) {
   const content = gitShow("plugins/hooks/hooks/" + name);
   if (content === null) return null;
-  const p = join(work, name);
-  writeFileSync(p, content);
-  chmodSync(p, 0o755);
-  return p;
+  const shPath = join(work, name);
+  writeFileSync(shPath, content);
+  chmodSync(shPath, 0o755);
+  return shPath;
 }
 
 const oldNoAbs = restoreSh("no-absolute-paths.sh");
 const oldPlan = restoreSh("force-plan-mode.sh");
 const oldFmt = restoreSh("fix-formatting.sh");
 
-// deterministic PRNG for fuzz
+// deterministic PRNG (mulberry32) for fuzz
 const seed = (process.argv[2] ? parseInt(process.argv[2], 10) : 0x5eed) >>> 0;
-let _s = seed >>> 0;
-function rnd() {
-  _s = (_s + 0x6d2b79f5) | 0;
-  let t = Math.imul(_s ^ (_s >>> 15), 1 | _s);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+let prngState = seed >>> 0;
+function nextRandom() {
+  prngState = (prngState + 0x6d2b79f5) | 0;
+  let hash = Math.imul(prngState ^ (prngState >>> 15), 1 | prngState);
+  hash = (hash + Math.imul(hash ^ (hash >>> 7), 61 | hash)) ^ hash;
+  return ((hash ^ (hash >>> 14)) >>> 0) / 4294967296;
 }
-const pick = (a) => a[Math.floor(rnd() * a.length)];
+const pick = (choices) => choices[Math.floor(nextRandom() * choices.length)];
 
-function runHook(cmd, args, input, env) {
-  const r = spawnSync(cmd, args, {
+function runHook(command, args, input, env) {
+  const result = spawnSync(command, args, {
     input,
     encoding: "utf8",
     env: { ...process.env, ...env },
   });
   return {
-    code: r.status === null ? -1 : r.status,
-    stdout: r.stdout || "",
-    stderr: r.stderr || "",
+    code: result.status === null ? -1 : result.status,
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
   };
 }
 
@@ -126,7 +138,7 @@ if (oldNoAbs) {
     `$dollar ${ROOT}`,
   ];
   // fuzz: random commands sometimes containing root / ~ / $HOME fragments
-  const frag = [
+  const fragments = [
     "",
     ROOT,
     ROOT + "/a",
@@ -139,25 +151,25 @@ if (oldNoAbs) {
   ];
   for (let i = 0; i < 400; i++) {
     corpus.push(
-      `${pick(["ls", "cat", "git diff", "echo", "cd", "grep x"])} ${pick(frag)} ${pick(["", "-l", "x", "../y"])}`.trim(),
+      `${pick(["ls", "cat", "git diff", "echo", "cd", "grep x"])} ${pick(fragments)} ${pick(["", "-l", "x", "../y"])}`.trim(),
     );
   }
-  for (const cmd of corpus) {
-    const payload = JSON.stringify({ tool_input: { command: cmd } });
-    const o = runHook("bash", [oldNoAbs], payload, env);
-    const n = runHook(
+  for (const command of corpus) {
+    const payload = JSON.stringify({ tool_input: { command } });
+    const oldRun = runHook("bash", [oldNoAbs], payload, env);
+    const newRun = runHook(
       process.execPath,
       [join(HOOKS, "no-absolute-paths.mjs")],
       payload,
       env,
     );
-    compare("no-absolute-paths:exit", cmd, o.code, n.code);
-    // both blocks must carry a "BLOCKED" stderr (exact message equivalence is a stronger check)
+    compare("no-absolute-paths:exit", command, oldRun.code, newRun.code);
+    // both blocks must carry a "BLOCKED" stderr (a stronger check than the exit code alone)
     compare(
       "no-absolute-paths:blocked",
-      cmd,
-      /BLOCKED/.test(o.stderr),
-      /BLOCKED/.test(n.stderr),
+      command,
+      /BLOCKED/.test(oldRun.stderr),
+      /BLOCKED/.test(newRun.stderr),
     );
   }
 }
@@ -165,13 +177,13 @@ if (oldNoAbs) {
 // ===========================================================================
 // 2) force-plan-mode — compare parsed-JSON stdout (jq pretty vs JSON.stringify differ in bytes)
 // ===========================================================================
-function parseOrNull(s) {
-  const t = s.trim();
-  if (t === "") return null;
+function parseOrNull(stdout) {
+  const trimmed = stdout.trim();
+  if (trimmed === "") return null;
   try {
-    return JSON.stringify(JSON.parse(t)); // normalize for comparison
+    return JSON.stringify(JSON.parse(trimmed)); // normalize for comparison
   } catch {
-    return "UNPARSEABLE:" + oneline(s);
+    return "UNPARSEABLE:" + oneline(stdout);
   }
 }
 if (oldPlan) {
@@ -220,8 +232,12 @@ if (oldPlan) {
     "plan it#",
     "plan that_",
     "plan this5",
+    // a legit "make a plan" preceded by a word (must still match in BOTH; the divergent substring
+    // cases like "remake a planet" are intentional improvements over the old .sh, so they live only
+    // in run-hook-tests, not here — this differential asserts old==new):
+    "please make a plan",
   ];
-  const planFrag = [
+  const planFragments = [
     "/plan",
     "plan this",
     "plan it",
@@ -230,7 +246,7 @@ if (oldPlan) {
     "draft a plan",
     "write a plan",
   ];
-  const noiseFrag = [
+  const noiseFragments = [
     "planning",
     "explain",
     "the plan",
@@ -241,31 +257,31 @@ if (oldPlan) {
   ];
   for (let i = 0; i < 400; i++) {
     const parts = [];
-    const n = 1 + Math.floor(rnd() * 3);
-    for (let j = 0; j < n; j++) {
+    const partCount = 1 + Math.floor(nextRandom() * 3);
+    for (let j = 0; j < partCount; j++) {
       parts.push(
-        pick(rnd() < 0.5 ? planFrag : noiseFrag).concat(
+        pick(nextRandom() < 0.5 ? planFragments : noiseFragments).concat(
           pick(["", ".", "!", " x", "?"]),
         ),
       );
     }
-    corpus.push(parts.join(rnd() < 0.5 ? " " : "\n"));
+    corpus.push(parts.join(nextRandom() < 0.5 ? " " : "\n"));
   }
   for (const prompt of corpus) {
     const payload = JSON.stringify({ prompt });
-    const o = runHook("bash", [oldPlan], payload, {});
-    const n = runHook(
+    const oldRun = runHook("bash", [oldPlan], payload, {});
+    const newRun = runHook(
       process.execPath,
       [join(HOOKS, "force-plan-mode.mjs")],
       payload,
       {},
     );
-    compare("force-plan-mode:exit", prompt, o.code, n.code);
+    compare("force-plan-mode:exit", prompt, oldRun.code, newRun.code);
     compare(
       "force-plan-mode:json",
       prompt,
-      parseOrNull(o.stdout),
-      parseOrNull(n.stdout),
+      parseOrNull(oldRun.stdout),
+      parseOrNull(newRun.stdout),
     );
   }
 }
@@ -274,15 +290,16 @@ if (oldPlan) {
 // 3) fix-formatting — compare which npx formatter is invoked, via a PATH stub
 // ===========================================================================
 if (oldFmt) {
-  // stub `npx` that appends its args to $STUB_LOG and exits 0 (so no real formatter runs)
-  const realStub = mkdtempSync(join(tmpdir(), "stub-"));
-  const stubPath = join(realStub, "npx");
+  // stub `npx` that appends its args to $STUB_LOG and exits 0 (so no real formatter runs). Nested
+  // under `work` so the single rmSync(work) at the end cleans it up too (no leaked temp dir).
+  const stubDir = mkdtempSync(join(work, "stub-"));
+  const stubPath = join(stubDir, "npx");
   writeFileSync(
     stubPath,
     '#!/bin/sh\nprintf "%s\\n" "$*" >> "$STUB_LOG"\nexit 0\n',
   );
   chmodSync(stubPath, 0o755);
-  const stubEnvPath = realStub + ":" + process.env.PATH;
+  const stubEnvPath = stubDir + ":" + process.env.PATH;
 
   const paths = [
     "src/x.ts",
@@ -310,36 +327,41 @@ if (oldFmt) {
     "b.txt.md",
     "",
   ];
-  function invoked(hookCmd, hookArgs, filePath) {
-    const logFile = join(realStub, "log-" + Math.floor(rnd() * 1e9));
-    const r = spawnSync(hookCmd, hookArgs, {
+  function invokedFormatter(hookCommand, hookArgs, filePath) {
+    const logFile = join(stubDir, "log-" + Math.floor(nextRandom() * 1e9));
+    const result = spawnSync(hookCommand, hookArgs, {
       input: JSON.stringify({ tool_input: { file_path: filePath } }),
       encoding: "utf8",
       env: { ...process.env, PATH: stubEnvPath, STUB_LOG: logFile },
     });
     const log = existsSync(logFile) ? readFileSync(logFile, "utf8").trim() : "";
-    return { code: r.status === null ? -1 : r.status, log };
+    return { code: result.status === null ? -1 : result.status, log };
   }
-  for (const fp of paths) {
-    const o = invoked("bash", [oldFmt], fp);
-    const n = invoked(
+  // normalize the logged npx invocation to formatter + mode (ignore -y ordering noise)
+  const normalize = (log) => {
+    if (!log) return "NONE";
+    if (/prettier/.test(log)) {
+      return "prettier:" + (/--write/.test(log) ? "write" : "?");
+    }
+    if (/markdownlint/.test(log)) {
+      return "markdownlint:" + (/--fix/.test(log) ? "fix" : "?");
+    }
+    return "OTHER:" + oneline(log);
+  };
+  for (const filePath of paths) {
+    const oldRun = invokedFormatter("bash", [oldFmt], filePath);
+    const newRun = invokedFormatter(
       process.execPath,
       [join(HOOKS, "fix-formatting.mjs")],
-      fp,
+      filePath,
     );
-    compare("fix-formatting:exit", fp, o.code, n.code);
-    // normalize: extract formatter name + that the file path is passed (ignore -y ordering noise)
-    const norm = (log) => {
-      if (!log) return "NONE";
-      if (/prettier/.test(log)) {
-        return "prettier:" + (/--write/.test(log) ? "write" : "?");
-      }
-      if (/markdownlint/.test(log)) {
-        return "markdownlint:" + (/--fix/.test(log) ? "fix" : "?");
-      }
-      return "OTHER:" + oneline(log);
-    };
-    compare("fix-formatting:formatter", fp, norm(o.log), norm(n.log));
+    compare("fix-formatting:exit", filePath, oldRun.code, newRun.code);
+    compare(
+      "fix-formatting:formatter",
+      filePath,
+      normalize(oldRun.log),
+      normalize(newRun.log),
+    );
   }
 }
 
@@ -352,14 +374,14 @@ if (oldFmt) {
       '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"MANDATORY: Invoke the /discipline skill NOW before doing anything else."}}',
     ),
   );
-  const n = runHook(
+  const newRun = runHook(
     process.execPath,
     [join(HOOKS, "session-start.mjs")],
     "",
     {},
   );
-  compare("session-start:exit", "(run)", 0, n.code);
-  compare("session-start:json", "(run)", oldJson, parseOrNull(n.stdout));
+  compare("session-start:exit", "(run)", 0, newRun.code);
+  compare("session-start:json", "(run)", oldJson, parseOrNull(newRun.stdout));
 }
 
 rmSync(work, { recursive: true, force: true });
@@ -368,11 +390,11 @@ console.log(
   `diff-hooks (seed=${seed}): old-vs-new equivalence — ${pass} matched, ${fail} diverged` +
     (oldNoAbs && oldPlan && oldFmt
       ? ""
-      : "  [WARN: some old .sh missing from git HEAD]"),
+      : "  [WARN: some old .sh missing from git history]"),
 );
 if (divergences.length) {
   console.log("");
-  for (const d of divergences.slice(0, 50)) console.log(d);
+  for (const divergence of divergences.slice(0, 50)) console.log(divergence);
   if (divergences.length > 50) {
     console.log(`… and ${divergences.length - 50} more`);
   }

@@ -9,12 +9,12 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 > not just one repo. A bug in a Bash hook affects every project at once. Install only if you
 > want that enforcement everywhere.
 
-> **All Node, cross-OS.** Every hook is a zero-dependency Node script that runs on every OS Claude
-> Code supports (native Windows included) — they need only `node` on `PATH` and no `jq`/`bash` at
-> runtime. The only subprocess is the auto-formatter (`fix-formatting.mjs`), which spawns
-> `npx prettier` / `markdownlint-cli2` (both ship with Node). A plugin **shell** hook can't run on
-> native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), which is why
-> none remain.
+> **All Node, cross-OS.** Every hook runs on Node and works on every OS Claude Code supports (native
+> Windows included) — they need only `node` on `PATH`, no `jq`/`bash`. All but one use only the Node
+> standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` /
+> `markdownlint-cli2` — `npx` ships with Node and fetches those formatters on demand (they are NOT
+> bundled). A plugin **shell** hook can't run on native Windows
+> ([#18610](https://github.com/anthropics/claude-code/issues/18610)), which is why none remain.
 
 ## Hooks
 

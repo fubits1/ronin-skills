@@ -52,7 +52,7 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All are zero-dependency cross-OS Node** (native Windows included — a plugin shell hook can't run on native Windows, [#18610](https://github.com/anthropics/claude-code/issues/18610)); the auto-formatter additionally spawns `npx prettier` / `markdownlint` (npx ships with Node). Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
 
 ```
 /plugin install hooks
