@@ -52,7 +52,7 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. They are a mix of runtimes: `no-bash.mjs` and `no-honest.mjs` are zero-dependency cross-OS Node (native Windows included); the rest (`force-plan-mode`, `no-absolute-paths`, auto-format) are **Bash/`jq` scripts — macOS and Linux, or WSL / Git Bash with `jq` on Windows**. Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
 
 ```
 /plugin install hooks
@@ -82,12 +82,16 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement ho
 | Hook | Trigger | What it does |
 | --- | --- | --- |
 | `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [no-bash.md](plugins/hooks/hooks/no-bash.md). |
-| `force-plan-mode.sh` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. |
-| `no-absolute-paths.sh` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
-| `fix-formatting.sh` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
+| `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. Zero-dependency cross-OS Node. |
+| `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. Zero-dependency cross-OS Node. |
+| `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. Cross-OS Node; spawns `npx`. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 
-A `SessionStart` hook also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+A `SessionStart` hook (`session-start.mjs`, Node) also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+
+## Migration: all enforcement hooks are now cross-OS Node
+
+The remaining shell hooks — `force-plan-mode`, `no-absolute-paths`, `fix-formatting`, and the inline `SessionStart` directive — are ported from Bash to zero-dependency Node (`*.mjs`), joining `no-bash` and `no-honest`. Plugin **shell** hooks don't run on native Windows ([#18610](https://github.com/anthropics/claude-code/issues/18610)), so the whole `hooks` plugin is now cross-OS with **no `bash`/`jq` runtime dependency** (the auto-formatter still spawns `npx prettier` / `markdownlint-cli2`, which ship with Node). **Behavior is unchanged.** Update with `/plugin marketplace update ronin-skills` + `/reload-plugins`.
 
 ## Migration: the `nogrep` hook + skill are renamed to `no-bash`
 

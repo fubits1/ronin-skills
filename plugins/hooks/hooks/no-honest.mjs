@@ -32,7 +32,9 @@ import {
   readSync,
   closeSync,
   readFileSync,
+  realpathSync,
 } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const TAIL_BYTES = 256 * 1024; // bounded read window — covers a turn, flat cost vs session size
 const WORD_RE = /\bhonest(ly)?\b/;
@@ -75,6 +77,40 @@ function isUserPrompt(e) {
   return false;
 }
 
+// The assistant text in the CURRENT turn = every assistant text block after the last genuine user
+// prompt. Exported so the decision can be unit-tested without spawning the hook.
+export function turnAssistantText(entries) {
+  let lastPrompt = -1;
+  for (let i = 0; i < entries.length; i++) {
+    if (isUserPrompt(entries[i])) lastPrompt = i;
+  }
+  let text = "";
+  for (let i = lastPrompt + 1; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!isAssistant(entry)) continue;
+    const content = entry?.message?.content;
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block?.type === "text" && block.text) text += block.text + "\n";
+      }
+    } else if (typeof content === "string" && content) {
+      text += content + "\n"; // some turns store assistant content as a plain string, not blocks
+    }
+  }
+  return text;
+}
+
+// Does the turn text vouch ("honest"/"honestly") outside code? Strip fenced + inline code first so a
+// code sample or quoted string containing the word doesn't trip it. Exported for testing.
+export function detectVouching(text) {
+  if (!text) return false;
+  const scanned = text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]*`/g, "")
+    .toLowerCase();
+  return WORD_RE.test(scanned);
+}
+
 function main() {
   let input;
   try {
@@ -109,31 +145,7 @@ function main() {
     }
   }
 
-  // Turn boundary = last genuine user prompt; scan every assistant text block after it.
-  let u = -1;
-  for (let i = 0; i < entries.length; i++) if (isUserPrompt(entries[i])) u = i;
-
-  let text = "";
-  for (let i = u + 1; i < entries.length; i++) {
-    const e = entries[i];
-    if (!isAssistant(e)) continue;
-    const c = e?.message?.content;
-    if (Array.isArray(c)) {
-      for (const b of c) {
-        if (b?.type === "text" && b.text) text += b.text + "\n";
-      }
-    }
-  }
-  if (!text) process.exit(0);
-
-  // Strip fenced + inline code (multi-line fences handled natively here, unlike a per-line awk
-  // pass), then lowercase, so code or quoted strings containing the word don't trip it.
-  const scan = text
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`]*`/g, "")
-    .toLowerCase();
-
-  if (WORD_RE.test(scan)) {
+  if (detectVouching(turnAssistantText(entries))) {
     // additionalContext only — NOT decision:block (that crashes Opus 4.x thinking sessions; see
     // header). Non-blocking: the turn already ended; the model reads this on the next turn.
     process.stdout.write(
@@ -149,4 +161,22 @@ function main() {
   process.exit(0);
 }
 
-main();
+// Run only when executed directly (`node no-honest.mjs`); when imported (tests) export the core
+// without reading stdin / exiting. realpath both sides so a symlinked install path still matches; on
+// any uncertainty default to running (a Stop hook that no-ops is harmless, but consistency matters).
+let runAsHook = true;
+try {
+  runAsHook =
+    realpathSync(process.argv[1]) ===
+    realpathSync(fileURLToPath(import.meta.url));
+} catch {
+  runAsHook = true;
+}
+if (runAsHook) {
+  try {
+    main();
+  } catch {
+    // any internal error (e.g. stdin parsed to a non-object) → fail open; never break the session
+  }
+  process.exit(0);
+}

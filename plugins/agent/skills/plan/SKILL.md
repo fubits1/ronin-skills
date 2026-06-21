@@ -6,7 +6,7 @@ user-invocable: true
 
 # Plan
 
-- **HARD RULE: call `EnterPlanMode` as your FIRST tool call** on "plan", "plan this", "make a plan", or any variant: no `Read`, `Grep`, `Glob`, `Bash`, `Edit`, or `Write` before it. The `agent` plugin's `force-plan-mode.sh` UserPromptSubmit hook injects this directive; it is non-negotiable.
+- **HARD RULE: call `EnterPlanMode` as your FIRST tool call** on "plan", "plan this", "make a plan", or any variant: no `Read`, `Grep`, `Glob`, `Bash`, `Edit`, or `Write` before it. The `hooks` plugin's `force-plan-mode.mjs` UserPromptSubmit hook injects this directive; it is non-negotiable.
 - On "plan", "plan this", "make a plan", or any variant: ENTER PLAN MODE. Write the plan in the plan file. NOT in chat. NOT in a table. NOT in a code block. Plans in chat are worthless; the plan file is the only place plans belong.
 - NEVER skip plan mode because "it's simple enough". If the user said plan, they mean plan.
 - **Self-trigger** (plan without being asked) when: a CI failure has multiple root causes, the first fix attempt failed, or you're about to touch 3+ files.

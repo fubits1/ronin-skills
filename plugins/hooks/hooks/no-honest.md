@@ -39,4 +39,4 @@ The bounded read keeps latency flat; an unbounded full-file slurp was O(session 
 - **Plugin `Stop` hooks are unreliable**: `$CLAUDE_PLUGIN_ROOT` may not be injected ([#66557](https://github.com/anthropics/claude-code/issues/66557)), `node` may be missing from the hook's PATH ([#64064](https://github.com/anthropics/claude-code/issues/64064)), and `Stop` fires unreliably on Windows/VSCode ([#40029](https://github.com/anthropics/claude-code/issues/40029)). When the hook doesn't fire, the skill rule still applies.
 - Can't distinguish using the word from discussing it; needs `node` on `PATH`.
 
-Tested by `tests/run-no-honest-tests.sh` (run in CI). Sources: the Claude Code hooks docs, deslop's "False Vulnerability" trope, and the issues above.
+Tested by `tests/run-no-honest-tests.mjs` (run in CI). Sources: the Claude Code hooks docs, deslop's "False Vulnerability" trope, and the issues above.
