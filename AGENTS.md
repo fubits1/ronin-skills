@@ -26,7 +26,7 @@ Commit `b3975e6` added an option-injection "RCE" guard, ReDoS regex bounds, and 
 
 ## The one contract that IS load-bearing: fail-open
 
-Every hook must **fail open**: any malformed/absent/unexpected input or internal throw → `exit 0` (a block is `exit 2`), **never** crash, hang, or break the session. This is the real reliability property — test it, never regress it. `conformance-hooks.mjs` is the harness that enforces it across all six hook scripts (the five hooks + the SessionStart directive).
+Every hook must **fail open**: any malformed/absent/unexpected input or internal throw → `exit 0` (a block is `exit 2`), **never** crash, hang, or break the session. This is the real reliability property — test it, never regress it. `conformance-hooks.mjs` is the harness that enforces it across all six hooks: no-bash, no-absolute-paths, force-plan-mode, fix-formatting, no-honest, and session-start.
 
 ## Build / test / validate
 

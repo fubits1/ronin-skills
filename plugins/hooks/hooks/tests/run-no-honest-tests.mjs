@@ -18,6 +18,9 @@ import { tmpdir } from "node:os";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "no-honest.mjs");
 const WORK = mkdtempSync(join(tmpdir(), "nh-"));
+// Clean up the temp dir on ANY exit — normal end, process.exit, or an uncaught throw (e.g. runHook
+// below throwing on a broken hook). `exit` handlers must be synchronous; rmSync is.
+process.on("exit", () => rmSync(WORK, { recursive: true, force: true }));
 
 let pass = 0;
 let fail = 0;
@@ -29,6 +32,13 @@ function runHook(payload) {
     encoding: "utf8",
     timeout: 10000,
   });
+  // The hook's contract is fail-open exit 0. A spawn error or non-zero/timeout exit means the hook
+  // itself is broken — throw loudly instead of letting empty stdout read as a silent ALLOW (a false
+  // pass on the ALLOW-expecting cases). (no-honest never exits 2; only 0 is valid here.)
+  if (r.error) throw r.error;
+  if (r.status !== 0) {
+    throw new Error(`no-honest hook exited ${r.status}\n${r.stderr || ""}`);
+  }
   return r.stdout || "";
 }
 
@@ -169,6 +179,5 @@ runTurn(
   "It passes: 12 of 12. Output above.",
 );
 
-rmSync(WORK, { recursive: true, force: true });
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);
