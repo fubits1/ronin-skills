@@ -14,19 +14,40 @@ import { spawnSync } from "node:child_process";
 // `.mdx`, "prettier" for any other path. Matches the .sh skip rules.
 export function formatterFor(filePath) {
   if (typeof filePath !== "string" || filePath === "") return null;
+  // SECURITY (option injection → RCE): a path beginning with "-" is parsed by prettier/markdownlint
+  // as a CLI FLAG, not a file. e.g. file_path "--plugin=/tmp/evil.js" makes prettier load+EXECUTE
+  // that JS module; "--config=…" loads an arbitrary JS/.cjs config. npx args are passed shell-free,
+  // but the flag IS the payload so quoting can't help — prettier only treats a token as a flag when
+  // it starts with "-", so refusing leading-dash paths is the boundary. A real absolute path starts
+  // with "/" (or a drive letter); a relative path starting with "-" is pathological. Skip it.
+  if (filePath.startsWith("-")) return null;
   if (filePath.endsWith(".md")) return "markdownlint";
   if (filePath.endsWith(".mdx")) return null; // prettier pads md tables; markdownlint is .md-only
   return "prettier";
 }
 
+// Build the spawnSync spec for a formatter run — exported so it's testable per-OS WITHOUT spawning.
+// On Windows `npx` is a `.cmd` shim that Node refuses to spawn without a shell (the CVE-2024-27980
+// mitigation makes `spawnSync("npx.cmd", …)` throw EINVAL), so there we use shell:true with the path
+// quoted (stripping `"`/`%` — illegal in Windows paths / cmd-special — keeps the quoting safe). On
+// Unix, a no-shell argv array (injection-safe).
+export function formatterSpec(formatter, filePath, platform) {
+  const tool = formatter === "markdownlint" ? "markdownlint-cli2" : "prettier";
+  const flag = formatter === "markdownlint" ? "--fix" : "--write";
+  if (platform === "win32") {
+    const safePath = filePath.replace(/["%]/g, "");
+    return {
+      command: `npx -y ${tool} ${flag} "${safePath}"`,
+      args: [],
+      shell: true,
+    };
+  }
+  return { command: "npx", args: ["-y", tool, flag, filePath], shell: false };
+}
+
 function runFormatter(formatter, filePath) {
-  // Resolve npx per-OS without a shell (avoids shell-injection and is cross-OS): npx.cmd on Windows.
-  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-  const args =
-    formatter === "markdownlint"
-      ? ["-y", "markdownlint-cli2", "--fix", filePath]
-      : ["-y", "prettier", "--write", filePath];
-  spawnSync(npx, args, { stdio: "ignore" });
+  const spec = formatterSpec(formatter, filePath, process.platform);
+  spawnSync(spec.command, spec.args, { stdio: "ignore", shell: spec.shell });
 }
 
 function main() {

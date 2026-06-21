@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { checkAbsolutePaths } from "../no-absolute-paths.mjs";
 import { planDirective } from "../force-plan-mode.mjs";
-import { formatterFor } from "../fix-formatting.mjs";
+import { formatterFor, formatterSpec } from "../fix-formatting.mjs";
 import { sessionStartPayload } from "../session-start.mjs";
+import { detectVouching, turnAssistantText } from "../no-honest.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOKS = join(HERE, "..");
@@ -159,9 +160,47 @@ ok(formatterFor("README.md") === "markdownlint", ".md → markdownlint");
 ok(formatterFor("doc.mdx") === null, ".mdx → skip");
 ok(formatterFor("") === null, "empty → null");
 ok(formatterFor(undefined) === null, "undefined → null");
+// a leading-dash path is a CLI flag to prettier/markdownlint (option injection), never a file → skip
+ok(
+  formatterFor("--plugin=/tmp/evil.js") === null,
+  "leading-dash path (option injection) → null",
+);
+ok(formatterFor("-rf") === null, "leading-dash path → null");
 // never blocks: absent file_path → no formatter spawned → exit 0
 const fmt1 = runHook("fix-formatting.mjs", { tool_input: {} });
 ok(fmt1.code === 0, "subprocess: absent file_path → exit 0 (no spawn)");
+// formatterSpec per-OS (the Windows .cmd fix — can't spawn npx.cmd without a shell):
+const unix = formatterSpec("prettier", "a/b.ts", "linux");
+ok(
+  unix.command === "npx" &&
+    unix.shell === false &&
+    unix.args.join(" ") === "-y prettier --write a/b.ts",
+  "spec(unix): no-shell argv array",
+);
+const unixMd = formatterSpec("markdownlint", "x.md", "darwin");
+ok(
+  unixMd.args.join(" ") === "-y markdownlint-cli2 --fix x.md" && !unixMd.shell,
+  "spec(unix): markdownlint argv",
+);
+const win = formatterSpec("prettier", "C:\\my file.ts", "win32");
+ok(
+  win.shell === true &&
+    win.args.length === 0 &&
+    win.command === 'npx -y prettier --write "C:\\my file.ts"',
+  "spec(win32): shell:true, path quoted (handles spaces)",
+);
+const winMd = formatterSpec("markdownlint", "x.md", "win32");
+ok(
+  winMd.shell === true &&
+    winMd.command === 'npx -y markdownlint-cli2 --fix "x.md"',
+  "spec(win32): markdownlint shell command",
+);
+// win32 quoting strips `"` and `%` (illegal-in-Win-path / cmd-special) so it can't break the quotes
+const winInject = formatterSpec("prettier", 'a"b%c.ts', "win32");
+ok(
+  winInject.command === 'npx -y prettier --write "abc.ts"',
+  'spec(win32): strips " and % from the quoted path',
+);
 
 console.log("=== session-start ===");
 ok(
@@ -186,6 +225,71 @@ ok(
     ssParsed &&
     ssParsed.hookSpecificOutput.hookEventName === "SessionStart",
   "subprocess: emits valid SessionStart JSON, exit 0",
+);
+
+console.log("=== no-honest ===");
+ok(
+  detectVouching("To be honest, I ran it.") === true,
+  "opener 'to be honest' → true",
+);
+ok(detectVouching("Honestly I did not check.") === true, "'honestly' → true");
+ok(
+  detectVouching("the honesty policy applies") === false,
+  "'honesty' (noun) → false",
+);
+ok(detectVouching("that would be dishonest") === false, "'dishonest' → false");
+ok(
+  detectVouching("the word `honest` in code") === false,
+  "inline-code 'honest' → false",
+);
+ok(
+  detectVouching("```\nhonestly\n```") === false,
+  "fenced-code 'honestly' → false",
+);
+ok(detectVouching("") === false, "empty → false");
+ok(detectVouching("plain proof, exit 0") === false, "no vouch word → false");
+// turnAssistantText: only assistant text AFTER the last genuine user PROMPT (tool-results are role
+// user but carry no text → not a turn boundary)
+const entries = [
+  {
+    type: "assistant",
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: "OLD turn" }],
+    },
+  },
+  {
+    type: "user",
+    message: { role: "user", content: [{ type: "text", text: "the prompt" }] },
+  },
+  {
+    type: "assistant",
+    message: { role: "assistant", content: [{ type: "text", text: "new A" }] },
+  },
+  {
+    type: "user",
+    message: { role: "user", content: [{ type: "tool_result", content: "x" }] },
+  },
+  {
+    type: "assistant",
+    message: { role: "assistant", content: [{ type: "text", text: "new B" }] },
+  },
+];
+const turn = turnAssistantText(entries);
+ok(
+  turn.includes("new A") && turn.includes("new B"),
+  "turnText: includes both post-prompt assistant blocks",
+);
+ok(!turn.includes("OLD turn"), "turnText: excludes the previous turn");
+// fail-open: a transcript_path that is a directory (statSync isFile guard) must not crash or hang —
+// the blocking openSync on a FIFO would otherwise stall the session past its timeout.
+const nhDir = runHook("no-honest.mjs", {
+  transcript_path: HERE,
+  stop_hook_active: false,
+});
+ok(
+  nhDir.code === 0,
+  "no-honest: directory transcript_path → exit 0 (isFile guard, no hang)",
 );
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);

@@ -49,10 +49,15 @@ const RE_BASHC_BANNED = new RegExp(
     ")" +
     TAIL,
 );
+// The inner sed-arg run is bounded `{0,32}` (not `*`): combined with the leading `[^"']*` it would
+// otherwise be O(n²) — `[^"']*` offers N start positions for `sed`, and an UNbounded `(\S+\s+)*`
+// scans O(n) from each before failing (a `bash -c 'sed sed sed … '` flood → quadratic CPU hang,
+// measured 23 s at 160 KB; no fast fail-open). A real sed has a handful of args, so 32 never misses a
+// model reflex while making per-start work constant → linear overall. Same guard on the bare forms.
 const RE_BASHC_SED_N =
-  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+)*-n(\s|$)/;
+  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+){0,32}-n(\s|$)/;
 const RE_BASHC_SED_NP =
-  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
+  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+){0,32}(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
 const RE_DOLLAR_SUB = new RegExp(
   "\\$\\(\\s*" + WRAP + PATHQ + "(" + BANNED + ")" + TAIL,
 );
@@ -68,9 +73,9 @@ const RE_PROCSUB = new RegExp(
 // lets a real mutation slip past (`git -C /repo commit` was allowed).
 const GIT_GLOBAL =
   /^(-C\s+\S+|-c\s+\S+|--git-dir(=\S+|\s+\S+)|--work-tree(=\S+|\s+\S+)|--namespace(=\S+|\s+\S+)|--exec-path(=\S+)?|--no-pager|--paginate|-p|--bare|--no-replace-objects|--(no-)?literal-pathspecs|--glob-pathspecs|--icase-pathspecs)\s+/;
-const RE_SED_N = /sed\s+(\S+\s+)*-n(\s|$)/;
+const RE_SED_N = /sed\s+(\S+\s+){0,32}-n(\s|$)/;
 const RE_SED_NP =
-  /sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
+  /sed\s+(\S+\s+){0,32}(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
 
 const MSG = {
   "node-shellout":
@@ -165,8 +170,12 @@ function chainCount(command) {
   // opener would otherwise rescan to end → O(n²)) is skipped and simply counts as chaining.
   let text = command;
   if (text.includes("\n") && (text.match(/<</g) || []).length <= 4) {
+    // Delimiter capture bounded `\w{0,62}` (≤63-char identifier), not `\w*`: a long single-token
+    // delimiter (`<<aaaa…\n`) made `\w*` backtrack char-by-char while the lazy `[\s\S]*?` rescanned
+    // the body at each step → O(n²) (measured 21 s at 400 KB). Real heredoc tags (EOF/END/SQL/…) are
+    // short, so 63 never misses one while capping the backtrack to constant → linear.
     text = text.replace(
-      /<<-?\s*["']?([A-Za-z_]\w*)["']?[\s\S]*?\n[ \t]*\1\b/g,
+      /<<-?\s*["']?([A-Za-z_]\w{0,62})["']?[\s\S]*?\n[ \t]*\1\b/g,
       " ",
     );
   }

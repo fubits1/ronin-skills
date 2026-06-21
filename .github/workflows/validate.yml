@@ -60,5 +60,7 @@ jobs:
         run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
       - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start)
         run: node plugins/hooks/hooks/tests/run-hook-tests.mjs
+      - name: protocol-conformance + fail-open harness (all hooks, full stdin envelope)
+        run: node plugins/hooks/hooks/tests/conformance-hooks.mjs
       - name: Run no-honest hook tests
         run: bash plugins/hooks/hooks/tests/run-no-honest-tests.sh
