@@ -189,11 +189,17 @@ ok(
     winMd.command === 'npx -y markdownlint-cli2 --fix "x.md"',
   "spec(win32): markdownlint shell command",
 );
-// win32 quoting strips `"` and `%` (illegal-in-Win-path / cmd-special) so it can't break the quotes
-const winInject = formatterSpec("prettier", 'a"b%c.ts', "win32");
+// win32 rejects a path with `"` (breaks quoting) or `%` (cmd %VAR% expansion; % is legal in NTFS, so
+// stripping would mis-target a real file) → fail open, skip formatting rather than mutate the path
 ok(
-  winInject.command === 'npx -y prettier --write "abc.ts"',
-  'spec(win32): strips " and % from the quoted path',
+  formatterSpec("prettier", 'a"b%c.ts', "win32") === null,
+  'spec(win32): unquotable path (" or %) → null (skip, never mis-target)',
+);
+// a normal win32 path with neither char still formats
+ok(
+  formatterSpec("prettier", "C:\\proj\\src\\x.ts", "win32")?.command ===
+    'npx -y prettier --write "C:\\proj\\src\\x.ts"',
+  "spec(win32): clean path → quoted command",
 );
 
 console.log("=== session-start ===");

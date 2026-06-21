@@ -22,15 +22,17 @@ export function formatterFor(filePath) {
 // Build the spawnSync spec for a formatter run — exported so it's testable per-OS WITHOUT spawning.
 // On Windows `npx` is a `.cmd` shim that Node refuses to spawn without a shell (the CVE-2024-27980
 // mitigation makes `spawnSync("npx.cmd", …)` throw EINVAL), so there we use shell:true with the path
-// quoted (stripping `"`/`%` — illegal in Windows paths / cmd-special — keeps the quoting safe). On
-// Unix, a no-shell argv array (injection-safe).
+// interpolated into a double-quoted command string. A path containing `"` (breaks the quoting) or `%`
+// (triggers cmd `%VAR%` expansion) can't be safely quoted — and `%` IS legal in NTFS, so stripping it
+// would silently format the WRONG file. So fail open: return null and skip such a path rather than
+// mutate it. On Unix, a no-shell argv array (injection-safe), so no such restriction.
 export function formatterSpec(formatter, filePath, platform) {
   const tool = formatter === "markdownlint" ? "markdownlint-cli2" : "prettier";
   const flag = formatter === "markdownlint" ? "--fix" : "--write";
   if (platform === "win32") {
-    const safePath = filePath.replace(/["%]/g, "");
+    if (/["%]/.test(filePath)) return null; // unquotable in a cmd string → skip, never mis-target
     return {
-      command: `npx -y ${tool} ${flag} "${safePath}"`,
+      command: `npx -y ${tool} ${flag} "${filePath}"`,
       args: [],
       shell: true,
     };
@@ -40,6 +42,7 @@ export function formatterSpec(formatter, filePath, platform) {
 
 function runFormatter(formatter, filePath) {
   const spec = formatterSpec(formatter, filePath, process.platform);
+  if (!spec) return; // win32 path with unquotable chars → fail open, don't format
   spawnSync(spec.command, spec.args, { stdio: "ignore", shell: spec.shell });
 }
 
