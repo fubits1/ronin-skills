@@ -54,16 +54,22 @@ function runMessage(label, command, substr) {
 }
 
 console.log("=== Banned tools BLOCK and name the right dedicated tool ===");
+// search messages name the Grep/Glob tool (Windows/npm) AND the fff MCP fallback
+// (native macOS/Linux builds, where 2.1.117 removed the Grep/Glob tools)
 runMessage("grep", "grep foo file", "Use the Grep tool");
+runMessage("grep-fff", "grep foo file", "mcp__fff__grep");
 runMessage("egrep", "egrep foo file", "Use the Grep tool");
-runMessage("rg", "rg foo file", "Use the Grep tool");
+runMessage("rg", "rg foo file", "mcp__fff__grep");
 runMessage("cat-read", "cat file", "Use the Read tool");
 runMessage("head", "head -20 file", "Use the Read tool");
 runMessage("tail", "tail -20 file", "Use the Read tool");
 runMessage("find", "find . -name '*.ts'", "Use the Glob tool");
+runMessage("find-fff", "find . -name '*.ts'", "mcp__fff__find_files");
 runMessage("sed-read", "sed -n 10,20p file", "Use the Read tool");
-runMessage("awk", "awk '{print $1}' file", "awk");
-runMessage("wc", "wc -l file", "output_mode");
+runMessage("awk", "awk '{print $1}' file", "Use the Grep tool");
+runMessage("awk-fff", "awk '{print $1}' file", "mcp__fff__grep");
+runMessage("wc", "wc -l file", "output_mode: 'count'");
+runMessage("wc-fff", "wc -l file", "mcp__fff__grep");
 
 console.log("\n=== cat write-vs-read routing (the redirect fix) ===");
 runMessage("cat-stdout-write", "cat foo > out.txt", "Use the Write tool");
@@ -100,16 +106,32 @@ runCase(BLOCK, "timeout-grep", "timeout 5 grep foo f");
 runCase(BLOCK, "xargs-grep", "xargs grep foo");
 runCase(BLOCK, "xargs-I-grep", "xargs -I {} grep foo {}");
 runCase(BLOCK, "dollar-sub", "echo $(grep foo f)");
+// substitution / shell-wrapping messages name the fff fallback too (native builds, 2.1.117)
+runMessage("dollar-sub-fff", "echo $(grep foo f)", "mcp__fff__grep");
 runCase(BLOCK, "backtick-sub", "echo `cat f`");
+runMessage("backtick-sub-fff", "echo `grep foo f`", "mcp__fff__grep");
 runCase(BLOCK, "procsub", "diff <(cat a) <(cat b)");
+runMessage("procsub-fff", "diff <(grep a f) <(grep b f)", "mcp__fff__grep");
 runMessage("bashc", 'bash -c "grep foo f"', "bash -c");
+runMessage("bashc-banned-fff", 'bash -c "grep foo f"', "mcp__fff__grep");
 runCase(BLOCK, "bashc-login", 'bash -lc "cat f"');
 runCase(
   BLOCK,
   "node-shellout",
   "node -e \"require('child_process').execSync('grep x')\"",
 );
+runMessage(
+  "node-shellout-fff",
+  "node -e \"require('child_process').execSync('grep x')\"",
+  "mcp__fff__grep",
+);
+runMessage(
+  "python-shellout-fff",
+  "python3 -c \"import subprocess; subprocess.run(['grep','x'])\"",
+  "mcp__fff__grep",
+);
 runCase(BLOCK, "command-grep", "command grep x");
+runMessage("command-builtin-fff", "command grep x", "mcp__fff__grep");
 runCase(ALLOW, "command-v", "command -v node");
 
 console.log(
