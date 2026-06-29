@@ -74,7 +74,7 @@ const RE_SED_NP =
 
 // Shared note for search/read messages. The Grep/Glob tools were removed on native macOS/Linux
 // builds in 2.1.117 (Windows/npm keep them), so the dedicated alternative is fff there; Read works
-// on every build. Centralized so the six messages below can't drift apart.
+// on every build. Centralized so the seven messages below can't drift apart.
 const SEARCH_FALLBACK =
   "Read for reads; the Grep/Glob tool where present, or the fff MCP (mcp__fff__grep / mcp__fff__find_files) on native macOS/Linux builds where 2.1.117 removed Grep/Glob";
 

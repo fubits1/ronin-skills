@@ -55,6 +55,7 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 | `head -100 file` | n/a (use built-in) | **Read** `limit: 100` |
 | `tail -n +50 file \| head -30` | n/a (use built-in) | **Read** `offset: 50`, `limit: 30` |
 | `sed -n '50,80p' file` | n/a (use built-in) | **Read** `offset: 50`, `limit: 31` |
+| `awk '/pat/ {print}' file` | `mcp__fff__grep` `query: "file pat"` | **Grep** `pattern: "pat"`, `path: "file"` (or **Read**) |
 | `ls dir/` (listing) | `mcp__fff__find_files` `query: "dir/"` | **Glob** `pattern: "dir/*"` |
 | `wc -l file` | n/a (use built-in) | **Grep** `pattern: "."`, `output_mode: "count"`, `path: "file"` |
 

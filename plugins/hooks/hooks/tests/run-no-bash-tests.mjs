@@ -66,9 +66,9 @@ runMessage("tail", "tail -20 file", "Use the Read tool");
 runMessage("find", "find . -name '*.ts'", "Use the Glob tool");
 runMessage("find-fff", "find . -name '*.ts'", "mcp__fff__find_files");
 runMessage("sed-read", "sed -n 10,20p file", "Use the Read tool");
-runMessage("awk", "awk '{print $1}' file", "awk");
+runMessage("awk", "awk '{print $1}' file", "Use the Grep tool");
 runMessage("awk-fff", "awk '{print $1}' file", "mcp__fff__grep");
-runMessage("wc", "wc -l file", "output_mode");
+runMessage("wc", "wc -l file", "output_mode: 'count'");
 runMessage("wc-fff", "wc -l file", "mcp__fff__grep");
 
 console.log("\n=== cat write-vs-read routing (the redirect fix) ===");
