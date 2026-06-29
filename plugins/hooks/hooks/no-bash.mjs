@@ -72,23 +72,22 @@ const RE_SED_N = /sed\s+(\S+\s+)*-n(\s|$)/;
 const RE_SED_NP =
   /sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
 
+// Shared note for search/read messages. The Grep/Glob tools were removed on native macOS/Linux
+// builds in 2.1.117 (Windows/npm keep them), so the dedicated alternative is fff there; Read works
+// on every build. Centralized so the six messages below can't drift apart.
+const SEARCH_FALLBACK =
+  "Read for reads; the Grep/Glob tool where present, or the fff MCP (mcp__fff__grep / mcp__fff__find_files) on native macOS/Linux builds where 2.1.117 removed Grep/Glob";
+
 const MSG = {
-  "node-shellout":
-    "Use the dedicated tool (Grep/Read/Glob) instead of shelling out to a subprocess API from inside an embedded JS script.",
-  "python-shellout":
-    "Use the dedicated tool (Grep/Read/Glob) instead of shelling out to subprocess from inside an embedded Python script.",
-  "bashc-banned":
-    "A banned file-read/search tool (or sed-read) was invoked via 'bash -c' / 'sh -c'. Run it directly at the top level instead of wrapping it in a shell, so the hook can point you at the right tool.",
+  "node-shellout": `Use the dedicated tool (${SEARCH_FALLBACK}) instead of shelling out to a subprocess API from inside an embedded JS script.`,
+  "python-shellout": `Use the dedicated tool (${SEARCH_FALLBACK}) instead of shelling out to subprocess from inside an embedded Python script.`,
+  "bashc-banned": `A banned file-read/search tool (or sed-read) was invoked via 'bash -c' / 'sh -c'. Run it directly at the top level instead of wrapping it in a shell, so the hook can name the right tool (${SEARCH_FALLBACK}).`,
   "bashc-sed-read":
     "'sed' used as a reader inside bash -c / sh -c. Use the Read tool (offset/limit) instead.",
-  "dollar-sub":
-    "Banned tool inside command substitution $(...). Use the dedicated tool (Grep/Read/Glob).",
-  "backtick-sub":
-    "Banned tool inside backtick command substitution. Use the dedicated tool (Grep/Read/Glob).",
-  procsub:
-    "Banned tool inside process substitution <(...)/>(...). Use the dedicated tool (Grep/Read/Glob).",
-  "command-builtin":
-    "The 'command' builtin is banned as a tool-execution bypass (e.g. 'command grep'). Use the dedicated tool (Grep/Read/Glob). ('command -v foo' existence checks are allowed and pass.)",
+  "dollar-sub": `Banned tool inside command substitution $(...). Use the dedicated tool (${SEARCH_FALLBACK}).`,
+  "backtick-sub": `Banned tool inside backtick command substitution. Use the dedicated tool (${SEARCH_FALLBACK}).`,
+  procsub: `Banned tool inside process substitution <(...)/>(...). Use the dedicated tool (${SEARCH_FALLBACK}).`,
+  "command-builtin": `The 'command' builtin is banned as a tool-execution bypass (e.g. 'command grep'). Use the dedicated tool (${SEARCH_FALLBACK}). ('command -v foo' existence checks are allowed and pass.)`,
   "git-mutation":
     "Mutating git command. Use gh for remote state, or suggest the user run ! git <command> locally.",
   "cat-write":
@@ -96,12 +95,13 @@ const MSG = {
   "cat-read":
     "Use the Read tool instead of Bash cat. Read supports: offset, limit (for head/tail behavior). Line numbers included by default.",
   "bash-find":
-    "Use the Glob tool instead of Bash find. Glob supports: pattern (e.g. '**/*.ts', '**/*test*').",
+    "Use the Glob tool instead of Bash find. Glob supports: pattern (e.g. '**/*.ts', '**/*test*'). On native macOS/Linux builds the Glob tool was removed in 2.1.117; use the fff MCP (mcp__fff__find_files) instead.",
   "sed-read":
     "Use the Read tool instead of Bash sed for reading file ranges (-n / Np / N,Mp / $p). Read supports: offset, limit.",
   "bash-awk":
-    "Use the Grep tool (for searching) or Read tool (for reading) instead of Bash awk.",
-  "bash-wc": "Use the Grep tool with output_mode: 'count' instead of Bash wc.",
+    "Use the Grep tool (for searching) or Read tool (for reading) instead of Bash awk. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep) instead.",
+  "bash-wc":
+    "Use the Grep tool with output_mode: 'count' instead of Bash wc. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep, output_mode 'count') instead.",
   chaining:
     "No command chaining. You joined multiple commands with && / || / ; in one Bash call. Run each as a SEPARATE Bash call instead. Chaining hides later commands from per-command approval and is a documented permission-bypass vector. (The working directory persists across Bash calls, so 'cd dir && cmd' is unnecessary too. Pipes into jq and redirections like 2>&1 are fine.)",
 };
@@ -109,7 +109,7 @@ function block(tag, message) {
   return { tag, msg: message || MSG[tag] };
 }
 function grepMessage(tool) {
-  return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset.`;
+  return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep) instead, which returns structured, frecency-ranked results.`;
 }
 function readMessage(tool) {
   return `Use the Read tool instead of Bash ${tool}. Read supports: offset (start line), limit (number of lines).`;

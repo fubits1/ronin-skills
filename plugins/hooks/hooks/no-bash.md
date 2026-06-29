@@ -146,6 +146,33 @@ structured `BLOCKED | reason=…` line. The paired skill rule (`no-bash/SKILL.md
 hook blocks a command") tells the model to read the `reason=` and switch to the dedicated
 tool rather than re-issue the same command.
 
+## The Grep/Glob tools can be missing on native builds (2.1.117)
+
+Claude Code 2.1.117 **replaced** the `Grep` and `Glob` tools on **native macOS/Linux builds**
+with embedded `ugrep`/`bfs` run through the Bash tool; **Windows and npm-installed builds keep
+them unchanged** (SDK [#301](https://github.com/anthropics/claude-agent-sdk-typescript/issues/301)).
+The release notes say "replaced", and reports differ on whether `Grep`/`Glob` remain callable as
+tools on a native build or drop out entirely. With tool search (on by default, except behind a
+non-first-party `ANTHROPIC_BASE_URL`) deferring tool definitions behind `ToolSearch`, native-build
+sessions have been observed with `Grep`/`Glob` absent from both the palette and `ToolSearch`
+([#52121](https://github.com/anthropics/claude-code/issues/52121)).
+
+This breaks the assumption behind the teaching messages. They named "the Grep tool" / "the Glob
+tool" unconditionally; on a native build that tool may not be there, and Anthropic's replacement,
+Bash `ugrep`/`bfs`, is the raw-dump search this hook routes away from (it fails both reasons in
+"What the hook actually buys": a raw terminal dump, and an approval that does not cache). So the
+messages now name the structured alternatives: the `Grep`/`Glob` tool where the build still has
+it, the fff MCP on native builds, and `Read` (present on every build) for reads.
+
+The message is static, not branched by build, because the hook cannot tell which build it runs on:
+its stdin carries no tool list, there is no tool-availability API
+([#301](https://github.com/anthropics/claude-agent-sdk-typescript/issues/301)), and
+`process.platform` does not separate a native macOS build from an npm macOS install.
+`CLAUDE_DEGRADED_NATIVE_TOOLS=Grep,Glob` is Anthropic's opt-in to let Bash `grep`/`find` fall
+through when the native tools are gone; this hook does not rely on it. The performance trade-offs
+of the ugrep/bfs swap (slower literal search, a regex-backtracking OOM) are in the Sources below;
+they are not the hook's concern, only the tool-availability change is.
+
 ## Limits
 
 - regex, not a parser. A real bash AST parser
@@ -174,3 +201,15 @@ tool rather than re-issue the same command.
   [#20085](https://github.com/anthropics/claude-code/issues/20085)
 - [oryband/claude-code-auto-approve](https://github.com/oryband/claude-code-auto-approve):
   the AST-based alternative
+- [claude-agent-sdk#301](https://github.com/anthropics/claude-agent-sdk-typescript/issues/301):
+  Grep/Glob replaced by ugrep/bfs on native macOS/Linux builds in 2.1.117; no tool-availability
+  detection API
+- [claude-code#54394](https://github.com/anthropics/claude-code/issues/54394): a report of a
+  regex-backtracking OOM on the native ugrep path
+- [Genivia/ugrep#517](https://github.com/Genivia/ugrep/issues/517),
+  [ripgrep#2597](https://github.com/BurntSushi/ripgrep/discussions/2597): ugrep vs ripgrep
+  benchmark discussion (ugrep slower on some literal searches; regex performance cliffs)
+- [claude-code#52121](https://github.com/anthropics/claude-code/issues/52121),
+  [#52004](https://github.com/anthropics/claude-code/issues/52004),
+  [#51921](https://github.com/anthropics/claude-code/issues/51921): Grep/Glob missing under
+  default tool search
