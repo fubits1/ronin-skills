@@ -75,6 +75,25 @@ To update automatically at startup instead, enable auto-update once: open `/plug
 
 Skills in this marketplace have auto-invocation triggers defined in their descriptions. Claude Code may invoke them automatically when it detects relevant context (e.g. starting research, declaring a task done, running git commands). You can also invoke any skill manually via `/skill-name` or its fully qualified form `/agent:skill-name`. To disable auto-invocation for a specific skill, add `disable-model-invocation: true` to that skill's SKILL.md frontmatter.
 
+## Using these skills in OpenCode
+
+These skills install as a **Claude Code plugin**, so they land in `~/.claude/plugins/cache/ronin-skills/agent/<version>/skills/`. That path is **not** one of [OpenCode's skill-discovery roots](https://opencode.ai/docs/skills/) (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, plus project-local equivalents) — so OpenCode does not see them by default. Expose the cache directory explicitly:
+
+OpenCode's config supports a `skills.paths` array (*"Additional paths to skill folders"*), scanned recursively for `**/SKILL.md`. Point it at this plugin's skills directory in `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["~/.claude/plugins/cache/ronin-skills/agent/<version>/skills"]
+  }
+}
+```
+
+Pure config, no filesystem changes. The cache path is version-pinned, so bump `<version>` after `/plugin marketplace update ronin-skills`. `~/`-prefixed and project-relative paths are accepted too. The key is schema-valid (present in [`opencode.ai/config.json`](https://opencode.ai/config.json) under `skills.paths`) and implemented in the loader ([`skill/index.ts`](https://github.com/sst/opencode/blob/dev/packages/opencode/src/skill/index.ts)) even though the prose [config docs](https://opencode.ai/docs/config/) don't list it yet (feature request [#14370](https://github.com/sst/opencode/issues/14370), closed).
+
+This loads the skills **in addition** to anything in `~/.claude/skills/`. On a duplicate name OpenCode keeps the last one scanned, so a ronin skill shadows a same-named personal one (e.g. `ci`).
+
 ## Hooks
 
 The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
