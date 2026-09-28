@@ -110,6 +110,10 @@ runtime dependencies is the right trade.
      heredoc (`<<EOF`); a stderr redirect (`2>/dev/null`, `2>&1`, `1>&2`) or a `<<<`
      here-string is still a read and routes to `Read`.
    - `sed -n`/`Np` reads block while `sed 's///'` substitution passes.
+   - `perl`/`ruby` get the same split: a line-loop flag (`-n`/`-p`, including clusters such as
+     `-ne`/`-lne`/`-ane`) makes the interpreter a `grep`/`head` substitute and blocks with
+     `reason=interpreter-read`; an in-place flag (`-i`, `-i.bak`, `--in-place`) is an edit and
+     passes, checked first because `-pi` is both; a bare `-e` script or a script file passes.
    - `command -v foo` (POSIX existence check) passes; `command grep …` (execution bypass)
      blocks.
    - `git` is mutation-vs-read discriminated by subcommand (`gitMutates`): a write form
@@ -135,6 +139,37 @@ runtime dependencies is the right trade.
    and redirections (`>`, `2>&1`) are not chaining and pass.
 
 A bypass that slips a banned tool through is a bug to fix here, not a loophole to use.
+
+## Coverage, as a fraction
+
+The reflex this hook targets is "reach for a Bash reader instead of the dedicated tool", and that
+reflex is not tied to the nine names in `BANNED` — it moves to whatever binary is left. The table
+is the current score, so the next gap is visible rather than discovered mid-session. `GUARDED`
+names the arm that catches the shape; `GAP` is a deliberate non-goal under the threat model above.
+
+| Shape | Verdict | Where |
+| --- | --- | --- |
+| `grep` / `rg` / `cat` / `head` / `tail` / `find` / `awk` / `wc` | GUARDED | per-tool arms |
+| `sed -n` / `sed Np` read | GUARDED | `RE_SED_N` / `RE_SED_NP` |
+| `sed 's///'` edit | passes by design | `sed` arm falls through |
+| `perl`, every form | GUARDED | in `BANNED` + its own arm, `reason=bash-perl` |
+| `sed -i 's///'` | passes by design | the sanctioned in-place edit, and what replaces `perl -pi` |
+| `ruby`, `lua`, `php`, `busybox`, `xxd` | GAP | zero observed use here; add one only when a replay shows the reflex, never on symmetry |
+| banned tool via wrapper, `$(…)`, backticks, `<(…)`, `bash -c` | GUARDED | pre-extraction scans |
+| `/usr/bin/grep`, `\grep`, `VAR=x grep` | GUARDED | `normalizeFirst` |
+| `bash -c "perl …"`, `$(perl …)`, `` `perl …` ``, `<(perl …)` | GUARDED | `perl` is in `BANNED`, so every pre-extraction scan covers it |
+| `python -c "open(f).read()"`, `node -e "fs.readFileSync"` | GAP | both have real non-reader uses here (`jq` fallback, scripts); no reader-shaped instance in the replay. Revisit from evidence, not symmetry |
+| `ugrep`, `bfs` | pass, unrecommended | they pass (not in `BANNED`, no arm) and stay that way — no observed reflex to block. They are also not recommended: "the raw-dump search this hook routes away from", below |
+| `tee`, `dd of=`, heredoc into a non-`cat` command | GAP | write-side routing beyond `cat > file` is out of scope — `tee … <<EOF` is an explicit ALLOW in `redteam-no-bash.mjs` |
+| write a script, then run it | GAP | one indirection defeats any string-level analysis; that belongs to sandboxing, not to a nudge |
+| obfuscation: `'g''rep'`, `$'\x67rep'`, encoded payloads | GAP | documented non-goal, see the threat model |
+
+The `perl` row exists because the gap was observed, not imagined. In one session the hook blocked
+`grep`, `head` and `tail` as designed, and the agent read files with `perl -ne 'print if /…/'` for
+the rest of the session; replaying that transcript through `replay-transcript-no-bash.mjs` surfaced
+22 distinct such commands. Upstream reports the same reflex against a different guard —
+[claude-code#40408](https://github.com/anthropics/claude-code/issues/40408), where a 22-pattern
+write-blocklist was defeated by `perl -i -pe`.
 
 ## Block-message design
 

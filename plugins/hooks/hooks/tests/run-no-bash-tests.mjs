@@ -79,6 +79,22 @@ runMessage("cat-stderr-read", "cat foo 2>/dev/null", "Use the Read tool"); // st
 runMessage("cat-2to1-read", "cat foo 2>&1", "Use the Read tool");
 runMessage("cat-herestring-read", "cat <<< 'x'", "Use the Read tool"); // <<< here-string = READ
 
+console.log("\n=== perl is banned outright (every form) ===");
+runMessage("perl-ne", "perl -ne 'print if /x/' f", "Use the Grep tool");
+runMessage("perl-ne-fff", "perl -ne 'print if /x/' f", "mcp__fff__grep");
+runCase(BLOCK, "perl-cluster", "perl -lne 'print' f");
+runCase(BLOCK, "perl-inplace", "perl -pi -e 's/a/b/' f"); // sed -i covers in-place editing
+runCase(BLOCK, "perl-inplace-fused", "perl -0pi -e 's/a/b/' f");
+runCase(BLOCK, "perl-e-only", "perl -e 'print 1'");
+runCase(BLOCK, "perl-abs-path", "/usr/bin/perl -ne 'print' f");
+runCase(BLOCK, "perl-backslash", "\\perl -ne 'print' f");
+runCase(BLOCK, "perl-wrapper", "timeout 5 perl -ne 'print' f");
+runCase(BLOCK, "perl-dollar-sub", "echo $(perl -ne 'print' f)");
+runCase(BLOCK, "perl-bashc", "bash -c \"perl -ne 'print' f\"");
+runCase(ALLOW, "perl-in-quotes", 'echo "perl -ne print"'); // quoted text, not a command
+runCase(ALLOW, "sed-inplace", "sed -i 's/a/b/' f"); // the sanctioned in-place edit
+runCase(ALLOW, "ruby-script", "ruby script.rb"); // not banned: zero observed use
+
 console.log("\n=== git: mutating BLOCKS, read-only/inspection PASSES ===");
 runMessage("git-commit", "git commit -m x", "Mutating git");
 runCase(BLOCK, "git-push", "git push origin main");

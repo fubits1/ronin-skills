@@ -55,6 +55,27 @@ expect("BLOCK", "bash-tail", "banned:tail", "tail -5 f");
 expect("BLOCK", "bash-find", "banned:find", "find . -name x");
 expect("BLOCK", "bash-wc", "banned:wc", "wc -l f");
 
+console.log("\n=== perl: banned outright, every invocation form ===");
+expect("BLOCK", "bash-perl", "perl-ne", "perl -ne 'print if /x/' f");
+expect("BLOCK", "bash-perl", "perl-cluster-lne", "perl -lne 'print' f");
+expect("BLOCK", "bash-perl", "perl-ane", "perl -ane 'print $F[0]' f");
+expect("BLOCK", "bash-perl", "perl-inplace", "perl -pi -e 's/a/b/' f");
+expect("BLOCK", "bash-perl", "perl-inplace-0pi", "perl -0pi -e 's/a/b/' f");
+expect("BLOCK", "bash-perl", "perl-e-only", "perl -e 'print 1'");
+expect("BLOCK", "bash-perl", "perl-version", "perl --version");
+expect("BLOCK", "bash-perl", "perl-abs-path", "/usr/bin/perl -ne 'x' f");
+expect("BLOCK", "bash-perl", "perl-backslash", "\\perl -ne 'x' f");
+expect("BLOCK", "bash-perl", "perl-env-prefix", "FOO=1 perl -ne 'x' f");
+expect("BLOCK", "bash-perl", "perl-wrapper", "timeout 5 perl -ne 'x' f");
+expect("BLOCK", "bash-perl", "perl-xargs", "xargs perl -ne 'x'");
+expect("BLOCK", "dollar-sub", "perl-dollar-sub", "echo $(perl -ne 'x' f)");
+expect("BLOCK", "backtick-sub", "perl-backtick", "echo `perl -ne 'x' f`");
+expect("BLOCK", "procsub", "perl-procsub", "diff <(perl -ne 'x' a) b");
+expect("BLOCK", "bashc-banned", "perl-bashc", "bash -c \"perl -ne 'x' f\"");
+expect("ALLOW", "-", "sed-inplace", "sed -i 's/a/b/' f");
+expect("ALLOW", "-", "ruby-script", "ruby script.rb");
+expect("ALLOW", "-", "perl-in-quotes", 'echo "perl -ne print"');
+
 console.log(
   "\n=== Wrapped / substituted banned tools the model actually writes must BLOCK ===",
 );

@@ -15,7 +15,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc";
+const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc|perl";
 const WRAP =
   "((timeout|time|nice|nohup|stdbuf|env|exec|eval|builtin|xargs)\\s+(-\\S+\\s+|[0-9]+\\s+)*)?([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*";
 const PATHQ = "(\\\\?[A-Za-z0-9_./-]*/)?";
@@ -354,6 +354,11 @@ export function scan(command) {
       if (RE_SED_N.test(SUB) || RE_SED_NP.test(SUB)) return block("sed-read");
       continue;
     }
+    // `perl` is banned outright, unlike `sed`: a one-liner is a grep/cat substitute the model
+    // reaches for once the named readers block, and no workflow here needs it — `sed -i 's///'`
+    // covers in-place editing. Enumerating interpreters cannot close the class (claude-code#40408);
+    // this closes the one the agent actually reaches for.
+    if (FIRST === "perl") return block("bash-perl", grepMessage("perl"));
     if (FIRST === "awk") return block("bash-awk");
     if (FIRST === "wc") return block("bash-wc");
   }
