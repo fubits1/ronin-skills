@@ -382,7 +382,7 @@ export function scan(command, bashSearchAllowed = false) {
     if (FIRST === "perl") {
       return block(
         "bash-perl",
-        `${grepMessage("perl")} For in-place edits use the Edit tool, or sed -i 's///'.`,
+        `${grepMessage("perl")} For in-place edits use the Edit tool, or sed -i 's///' (GNU) / sed -i '' 's///' (macOS).`,
       );
     }
     if (FIRST === "awk") return block("bash-awk");

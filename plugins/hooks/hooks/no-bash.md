@@ -151,7 +151,7 @@ names the arm that catches the shape; `GAP` is a deliberate non-goal under the t
 | `sed -n` / `sed Np` read | GUARDED | `RE_SED_N` / `RE_SED_NP` |
 | `sed 's///'` edit | passes by design | `sed` arm falls through |
 | `perl`, every form | GUARDED | in `BANNED` + its own arm, `reason=bash-perl` |
-| `sed -i 's///'` | passes by design | the sanctioned in-place edit, and what replaces `perl -pi` |
+| `sed -i 's///'` (GNU), `sed -i '' 's///'` (macOS) | passes by design | the sanctioned in-place edit, and what replaces `perl -pi`; BSD sed reads the argument after `-i` as the backup suffix |
 | `ruby`, `lua`, `php`, `busybox`, `xxd` | GAP | zero observed use here; add one only when a replay shows the reflex, never on symmetry |
 | banned tool via wrapper, `$(…)`, backticks, `<(…)`, `bash -c` | GUARDED | pre-extraction scans |
 | `/usr/bin/grep`, `\grep`, `VAR=x grep` | GUARDED | `normalizeFirst` |

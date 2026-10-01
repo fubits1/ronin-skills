@@ -87,6 +87,8 @@ runMessage("perl-ne", "perl -ne 'print if /x/' f", "Use the Grep tool");
 runMessage("perl-ne-fff", "perl -ne 'print if /x/' f", "mcp__fff__grep");
 runCase(BLOCK, "perl-cluster", "perl -lne 'print' f");
 runMessage("perl-inplace", "perl -pi -e 's/a/b/' f", "sed -i"); // sed -i covers in-place editing
+// BSD sed on macOS reads the next argument after -i as the backup suffix, so the message names `sed -i ''`
+runMessage("perl-inplace-macos", "perl -pi -e 's/a/b/' f", "sed -i ''");
 runCase(BLOCK, "perl-inplace-fused", "perl -0pi -e 's/a/b/' f");
 runCase(BLOCK, "perl-e-only", "perl -e 'print 1'");
 runCase(BLOCK, "perl-abs-path", "/usr/bin/perl -ne 'print' f");
@@ -96,6 +98,7 @@ runCase(BLOCK, "perl-dollar-sub", "echo $(perl -ne 'print' f)");
 runCase(BLOCK, "perl-bashc", "bash -c \"perl -ne 'print' f\"");
 runCase(ALLOW, "perl-in-quotes", 'echo "perl -ne print"'); // quoted text, not a command
 runCase(ALLOW, "sed-inplace", "sed -i 's/a/b/' f"); // the sanctioned in-place edit
+runCase(ALLOW, "sed-inplace-macos", "sed -i '' 's/a/b/' f");
 runCase(ALLOW, "ruby-script", "ruby script.rb"); // not banned: zero observed use
 
 console.log("\n=== git: mutating BLOCKS, read-only/inspection PASSES ===");
