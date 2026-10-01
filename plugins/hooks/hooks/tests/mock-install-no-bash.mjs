@@ -58,19 +58,19 @@ try {
     fail++;
   }
 
-  // Substitute ${CLAUDE_PLUGIN_ROOT} → the spaced root, exactly as Claude Code does.
+  /**
+   * substitute ${CLAUDE_PLUGIN_ROOT} → the spaced root and run it through bash (the documented
+   * default hook shell), exactly as Claude Code does. only a real shell splits an unquoted root,
+   * and the resulting exit 1 is a non-blocking hook error, so the hook goes silent
+   */
   const command = template.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root);
-  // Parse `node <path>` WITHOUT splitting on spaces (the path contains a space): program = up to the
-  // first space, the rest is ONE argv element. This is what proves the spaced path survives.
-  const spaceIndex = command.indexOf(" ");
-  const program = command.slice(0, spaceIndex);
-  const argument = command.slice(spaceIndex + 1);
-  const executable = program === "node" ? process.execPath : program;
 
-  function invoke(command) {
-    const result = spawnSync(executable, [argument], {
-      input: JSON.stringify({ tool_input: { command } }),
+  function invoke(toolCommand) {
+    const result = spawnSync(command, {
+      shell: "bash",
+      input: JSON.stringify({ tool_input: { command: toolCommand } }),
       encoding: "utf8",
+      timeout: 10000, // a hook that hangs is a failure, not a pass
     });
     return {
       code: result.status === null ? -2 : result.status,
