@@ -12,6 +12,8 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "no-bash.mjs");
+// every case expects NO_BASH_SEARCH_FALLBACK unset; clear it so a session that sets it cannot flip them
+delete process.env.NO_BASH_SEARCH_FALLBACK;
 
 let pass = 0;
 let fail = 0;

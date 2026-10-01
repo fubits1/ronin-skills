@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // PreToolUse(Bash) hook: block Bash calls that prepend the project-root absolute path (or its `~` /
-// `$HOME` forms) to a command. cwd is already the project root, so relative paths suffice; prepending
-// absolute project-root paths bloats permissions.allow with single-use entries because Claude Code's
-// matcher treats relative and absolute paths as unrelated strings (anthropics/claude-code#18200).
+// `$HOME` forms) to a command. While the shell sits in the project root, relative paths suffice;
+// prepending absolute project-root paths bloats permissions.allow with single-use entries because
+// Claude Code's matcher treats relative and absolute paths as unrelated strings
+// (anthropics/claude-code#18200).
 //
 // Cross-OS Node port of no-absolute-paths.sh — a plugin SHELL hook can't run on native Windows
 // (#18610). Block: exit 2 + a stderr message. FAIL-OPEN: empty/absent command, missing root, or any
@@ -52,6 +53,14 @@ export function checkAbsolutePaths(command, root, homeDir) {
   return null;
 }
 
+function resolved(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
 function main() {
   let raw;
   try {
@@ -72,6 +81,19 @@ function main() {
   // /tmp→/private/tmp on macOS — that would flip block/allow on a symlinked project path).
   const root =
     process.env.CLAUDE_PROJECT_DIR || process.env.PWD || process.cwd();
+  /**
+   * shell outside root: allow
+   *
+   * the block's premise "cwd IS already that path" holds only while the shell sits at or under
+   * root. stdin `cwd` follows Bash `cd`, CLAUDE_PROJECT_DIR does not, so after `cd /tmp/x` the
+   * absolute root is the only way back. `cwd` arrives symlink-resolved (/private/tmp/x), so compare
+   * resolved forms
+   */
+  if (typeof input.cwd === "string" && input.cwd !== "") {
+    const cwd = resolved(input.cwd);
+    const realRoot = resolved(root);
+    if (cwd !== realRoot && !cwd.startsWith(realRoot + sep)) return;
+  }
   const homeDir = process.env.HOME || homedir();
   const hit = checkAbsolutePaths(command, root, homeDir);
   if (hit) {

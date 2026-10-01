@@ -26,7 +26,7 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 
 1. **[fff](https://fff.dmtrkovalenko.dev/) MCP** — first choice for any file search or content grep inside a git-indexed directory. Frecency-ranked results (frequent/recent files first, dirty files boosted), git-aware, constraint-aware. See README.md → "fff instead of grep/bash etc.".
 2. **Built-in `Grep` / `Read` / `Glob`** — fallback when fff isn't installed or the search target lies outside the git tree. `Read` is present on every build. The `Grep` and `Glob` tools were removed on native macOS/Linux builds in Claude Code 2.1.117 (replaced by Bash `ugrep`/`bfs`, which return raw dumps this hook routes away from); on those builds fff is the structured search path. Windows and npm-installed builds keep `Grep`/`Glob`.
-3. **Bash** — only for the legitimate uses listed at the bottom of this skill.
+3. **Bash** — only for the legitimate uses listed at the bottom of this skill. Search exception: a native build with fff down has no structured search left. Ask the user to set `NO_BASH_SEARCH_FALLBACK=1` (settings.json `env`); once set, plain `grep`/`find` pass.
 
 ### For JSON parsing / shaping
 
@@ -35,7 +35,7 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 
 ## The Rule
 
-**Never use Bash for reading or searching files.** Both fff and the built-in tools cover every case including multiline, context lines, counting, and pagination.
+**Never use Bash for reading or searching files.** Both fff and the built-in tools cover every case including multiline, context lines, counting, and pagination. Sole exception: item 3 above.
 
 ## Mapping Table
 
@@ -124,7 +124,7 @@ These are legitimate Bash uses — either they have no dedicated tool equivalent
 
 A `BLOCKED` line from this hook is a **deterministic environment rejection — NOT the user rejecting you.** The block message says so explicitly. Do not narrate it as "the user rejected my command"; the user did not act. Read the `reason=` field, switch to the dedicated tool, and never re-issue the same blocked command unchanged — it will fail identically.
 
-Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. If the message names `Grep` or `Glob` and that tool is not in this session, it was removed on native macOS/Linux builds in 2.1.117; use fff (`mcp__fff__grep` / `mcp__fff__find_files`) or `Read` instead, and still do not fall back to Bash. Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, a node/python shell-out, or `perl` in any form — the hook catches those too. `perl` is banned outright (`reason=bash-perl`): a `perl -ne 'print if /pat/'` written after a `grep` block is the same reflex wearing a different binary. For in-place edits use `Edit`, or `sed -i 's///'` where a formatter hook would reflow the file. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/no-bash.mjs`, not a loophole to exploit.
+Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. If the message names `Grep` or `Glob` and that tool is not in this session, it was removed on native macOS/Linux builds in 2.1.117; use fff (`mcp__fff__grep` / `mcp__fff__find_files`) or `Read` instead, and still do not fall back to Bash (sole exception: Tool Preference Order, item 3). Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, a node/python shell-out, or `perl` in any form — the hook catches those too. `perl` is banned outright (`reason=bash-perl`): a `perl -ne 'print if /pat/'` written after a `grep` block is the same reflex wearing a different binary. For in-place edits use `Edit`, or `sed -i 's///'` where a formatter hook would reflow the file. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/no-bash.mjs`, not a loophole to exploit.
 
 ## git Commands (permission routing)
 

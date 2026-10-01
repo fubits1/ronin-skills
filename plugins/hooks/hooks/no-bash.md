@@ -110,10 +110,8 @@ runtime dependencies is the right trade.
      heredoc (`<<EOF`); a stderr redirect (`2>/dev/null`, `2>&1`, `1>&2`) or a `<<<`
      here-string is still a read and routes to `Read`.
    - `sed -n`/`Np` reads block while `sed 's///'` substitution passes.
-   - `perl`/`ruby` get the same split: a line-loop flag (`-n`/`-p`, including clusters such as
-     `-ne`/`-lne`/`-ane`) makes the interpreter a `grep`/`head` substitute and blocks with
-     `reason=interpreter-read`; an in-place flag (`-i`, `-i.bak`, `--in-place`) is an edit and
-     passes, checked first because `-pi` is both; a bare `-e` script or a script file passes.
+   - `perl` gets no such split: it blocks in every form (`reason=bash-perl`), in-place `-pi`
+     included, because `sed -i 's///'` covers in-place editing. `ruby` is not banned.
    - `command -v foo` (POSIX existence check) passes; `command grep …` (execution bypass)
      blocks.
    - `git` is mutation-vs-read discriminated by subcommand (`gitMutates`): a write form
@@ -143,7 +141,7 @@ A bypass that slips a banned tool through is a bug to fix here, not a loophole t
 ## Coverage, as a fraction
 
 The reflex this hook targets is "reach for a Bash reader instead of the dedicated tool", and that
-reflex is not tied to the nine names in `BANNED` — it moves to whatever binary is left. The table
+reflex is not tied to the names in `BANNED` — it moves to whatever binary is left. The table
 is the current score, so the next gap is visible rather than discovered mid-session. `GUARDED`
 names the arm that catches the shape; `GAP` is a deliberate non-goal under the threat model above.
 
@@ -160,6 +158,7 @@ names the arm that catches the shape; `GAP` is a deliberate non-goal under the t
 | `bash -c "perl …"`, `$(perl …)`, `` `perl …` ``, `<(perl …)` | GUARDED | `perl` is in `BANNED`, so every pre-extraction scan covers it |
 | `python -c "open(f).read()"`, `node -e "fs.readFileSync"` | GAP | both have real non-reader uses here (`jq` fallback, scripts); no reader-shaped instance in the replay. Revisit from evidence, not symmetry |
 | `ugrep`, `bfs` | pass, unrecommended | they pass (not in `BANNED`, no arm) and stay that way — no observed reflex to block. They are also not recommended: "the raw-dump search this hook routes away from", below |
+| `grep` / `find` on a native build | GUARDED, unless the user opts in | on native macOS/Linux these names ARE the embedded ugrep/bfs (the shell snapshot shadows them). Blocked by default; `NO_BASH_SEARCH_FALLBACK=1` lets them through — see below |
 | `tee`, `dd of=`, heredoc into a non-`cat` command | GAP | write-side routing beyond `cat > file` is out of scope — `tee … <<EOF` is an explicit ALLOW in `redteam-no-bash.mjs` |
 | write a script, then run it | GAP | one indirection defeats any string-level analysis; that belongs to sandboxing, not to a nudge |
 | obfuscation: `'g''rep'`, `$'\x67rep'`, encoded payloads | GAP | documented non-goal, see the threat model |
@@ -207,6 +206,48 @@ its stdin carries no tool list, there is no tool-availability API
 through when the native tools are gone; this hook does not rely on it. The performance trade-offs
 of the ugrep/bfs swap (slower literal search, a regex-backtracking OOM) are in the Sources below;
 they are not the hook's concern, only the tool-availability change is.
+
+### `ugrep`/`bfs` are not a separate binary — they shadow `grep`/`find`
+
+On a native build the snapshot Claude Code sources into every Bash call replaces both names with the
+Claude binary re-executed under a different `argv[0]`. `type grep` reports "a shell function from
+`~/.claude/shell-snapshots/…`", and the body is:
+
+```sh
+local _cc_bin="${CLAUDE_CODE_EXECPATH:-}"
+[[ -x $_cc_bin ]] || _cc_bin=~/.local/bin/claude
+ARGV0=ugrep "$_cc_bin" -G --ignore-files --hidden -I --exclude-dir=.git … ${1+"$@"}
+```
+
+(`exec -a ugrep` on non-zsh shells; same mechanism, see
+[claude-code#78700](https://github.com/anthropics/claude-code/issues/78700).) So `which ugrep`
+finds nothing while ugrep is very much in use, and blocking `grep` on such a build blocks
+Anthropic's own embedded search, not GNU grep.
+
+### The one sanctioned fallback: `NO_BASH_SEARCH_FALLBACK=1`
+
+Blocking search is correct while a structured alternative exists. It stops being correct when none
+does: a native build (no `Grep`/`Glob` tools) with the fff MCP down leaves no compliant way to
+search at all, and an agent with no legal path takes an illegal one — that is how the `perl` reflex
+started.
+
+Setting `NO_BASH_SEARCH_FALLBACK=1` in `settings.json` → `env` lets `grep`, `egrep`, `fgrep`, `rg`
+and `find` through to Claude Code's embedded search (ugrep, ripgrep for `rg`, bfs). Deliberate
+properties:
+
+- **Opt-in, default off.** Absent the variable nothing changes. It is global and silent once set,
+  so unset it when fff is back.
+- **Search names only.** `cat`, `head`, `tail`, `sed -n`, `awk`, `wc` and `perl` stay blocked —
+  `Read` is present on every build, so reads never lack an alternative. The setting
+  allows command names, not purposes: an allowed `grep`/`find` can still print a whole file
+  (`grep '' f`, `find … -exec cat {} \;`). The hook does not try to catch that; an agent does not
+  write these to get around the hook (see the threat model).
+- **Not self-grantable.** The hook reads its own `process.env`, so a `NO_BASH_SEARCH_FALLBACK=1 grep …`
+  prefix on the command does not enable it; `normalizeFirst` strips the assignment and the arm
+  blocks as usual. Only the user, via settings, can open it.
+- **Direct invocations only.** The pre-extraction scans (`$(grep …)`, `bash -c "grep …"`, backticks,
+  process substitution) still block, because those regexes compose `BANNED` as a whole and cannot
+  discriminate a search tool from a reader.
 
 ## Limits
 

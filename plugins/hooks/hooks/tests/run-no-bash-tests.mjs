@@ -9,14 +9,17 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "no-bash.mjs");
+// the default cases expect NO_BASH_SEARCH_FALLBACK unset; clear it so a session that sets it cannot flip them
+delete process.env.NO_BASH_SEARCH_FALLBACK;
 let pass = 0;
 let fail = 0;
 const oneline = (text) => text.replace(/\n/g, "\\n");
-function run(command) {
+function run(command, env) {
   const payload = JSON.stringify({ tool_input: { command } });
   const r = spawnSync(process.execPath, [HOOK], {
     input: payload,
     encoding: "utf8",
+    env: { ...process.env, ...env },
   });
   if (r.error) return { code: -1, stderr: "spawn error: " + r.error.message };
   // status is null when the process is killed by a signal (e.g. timeout) — never read that as ALLOW.
@@ -25,8 +28,8 @@ function run(command) {
 const BLOCK = 2;
 const ALLOW = 0;
 // exit-code assertion
-function runCase(expected, label, command) {
-  const { code } = run(command);
+function runCase(expected, label, command, env) {
+  const { code } = run(command, env);
   if (code === expected) {
     console.log(
       `PASS  [${label} exit=${code === BLOCK ? "BLOCK" : code === ALLOW ? "ALLOW" : code}]  ${oneline(command)}`,
@@ -40,8 +43,8 @@ function runCase(expected, label, command) {
   }
 }
 // BLOCK + the teaching message must contain `substr` (proves the right tool is named back)
-function runMessage(label, command, substr) {
-  const { code, stderr } = run(command);
+function runMessage(label, command, substr, env) {
+  const { code, stderr } = run(command, env);
   if (code === BLOCK && stderr.includes(substr)) {
     console.log(`PASS  [${label} msg~"${substr}"]  ${oneline(command)}`);
     pass++;
@@ -83,7 +86,7 @@ console.log("\n=== perl is banned outright (every form) ===");
 runMessage("perl-ne", "perl -ne 'print if /x/' f", "Use the Grep tool");
 runMessage("perl-ne-fff", "perl -ne 'print if /x/' f", "mcp__fff__grep");
 runCase(BLOCK, "perl-cluster", "perl -lne 'print' f");
-runCase(BLOCK, "perl-inplace", "perl -pi -e 's/a/b/' f"); // sed -i covers in-place editing
+runMessage("perl-inplace", "perl -pi -e 's/a/b/' f", "sed -i"); // sed -i covers in-place editing
 runCase(BLOCK, "perl-inplace-fused", "perl -0pi -e 's/a/b/' f");
 runCase(BLOCK, "perl-e-only", "perl -e 'print 1'");
 runCase(BLOCK, "perl-abs-path", "/usr/bin/perl -ne 'print' f");
@@ -171,6 +174,70 @@ runCase(ALLOW, "jq", "jq .name package.json");
 runCase(ALLOW, "sed-subst", "sed 's/a/b/g' f");
 runCase(ALLOW, "make", "make build");
 runCase(ALLOW, "banned-in-quotes", 'echo "first; then cat results"');
+
+console.log(
+  "\n=== NO_BASH_SEARCH_FALLBACK=1 opens search (embedded ugrep/bfs) but nothing else ===",
+);
+{
+  const FALLBACK_ON = { NO_BASH_SEARCH_FALLBACK: "1" };
+  runCase(ALLOW, "fallback-on:grep", "grep foo file", FALLBACK_ON);
+  runCase(ALLOW, "fallback-on:rg", "rg foo file", FALLBACK_ON);
+  runCase(ALLOW, "fallback-on:find", "find . -name '*.ts'", FALLBACK_ON);
+  runCase(ALLOW, "fallback-on:egrep", "egrep foo file", FALLBACK_ON);
+  runCase(ALLOW, "fallback-on:fgrep", "fgrep foo file", FALLBACK_ON);
+  runCase(
+    ALLOW,
+    "fallback-on:timeout-grep",
+    "timeout 5 grep foo f",
+    FALLBACK_ON,
+  );
+  runCase(ALLOW, "fallback-on:xargs-grep", "xargs grep foo", FALLBACK_ON);
+  // only direct calls pass: the $(…) and bash -c scans check every name in BANNED, grep included
+  runCase(BLOCK, "fallback-on:dollar-sub", "echo $(grep foo f)", FALLBACK_ON);
+  runCase(BLOCK, "fallback-on:bashc", 'bash -c "grep foo f"', FALLBACK_ON);
+  // reads still block: Read exists on every build, so there is no gap to fill
+  runCase(BLOCK, "fallback-on:cat-still-blocked", "cat file", FALLBACK_ON);
+  runCase(BLOCK, "fallback-on:head-still-blocked", "head -5 file", FALLBACK_ON);
+  runCase(
+    BLOCK,
+    "fallback-on:perl-still-blocked",
+    "perl -ne 'print' file",
+    FALLBACK_ON,
+  );
+  runCase(
+    BLOCK,
+    "fallback-on:sed-read-still-blocked",
+    "sed -n 1,5p file",
+    FALLBACK_ON,
+  );
+  runCase(
+    BLOCK,
+    "fallback-on:chaining-still-blocked",
+    "grep a f && grep b f",
+    FALLBACK_ON,
+  );
+  // with the setting on, the git grep / perl messages must point to plain grep/find, not ask the
+  // user to set it again
+  runMessage(
+    "fallback-on:git-grep",
+    "git grep foo",
+    "plain grep/find pass",
+    FALLBACK_ON,
+  );
+  runMessage(
+    "fallback-on:perl",
+    "perl -ne 'print' f",
+    "plain grep/find pass",
+    FALLBACK_ON,
+  );
+  runMessage("fallback-off:find-message", "find .", "plain grep/find pass");
+  // a NO_BASH_SEARCH_FALLBACK=1 prefix on the command does not switch it on: the hook reads its own env
+  runCase(
+    BLOCK,
+    "fallback-prefix-ignored",
+    "NO_BASH_SEARCH_FALLBACK=1 grep foo file",
+  );
+}
 
 console.log("\n=== fail-open on empty / absent command ===");
 runCase(ALLOW, "empty-string", "");
