@@ -2,7 +2,7 @@
 
 ## A worked check, end to end
 
-**Claim:** every finding in the handover has a table row carrying a real `file:line`.
+**Claim:** every finding in the handover has a table row carrying a `file:line`-shaped reference.
 
 **Command**, keyed on the row, not on the string appearing somewhere:
 
@@ -16,15 +16,17 @@ jq -R -s --argjson ids '["r9","r7","r8"]' \
                        | select(test("[A-Za-z0-9_./-]+\\.(ts|js|svelte|json|md):[0-9]"))]
                  | length > 0)})
    | map(select(.ok | not) | .id)
-   | if length == 0 then "PASS" else "FAIL — no row with a file:line for: \(.)" end' DOC.md
+   | if length == 0 then "PASS" else ("FAIL — no row with a file:line for: \(.)\n" | halt_error(1)) end' DOC.md
 ```
 
 **Break it deliberately.** Copy to scratch, delete the `file:line` from *one row* (the structure
 the claim names) and run against the copy:
 
 ```text
-"FAIL — no row with a file:line for: [\"r9\"]"
+FAIL — no row with a file:line for: ["r9"]
 ```
+
+Exit status 1.
 
 **Record that output.** It is the evidence the check works. Discard the scratch copy; never mutate
 the artifact itself. Then run against the real file and expect `PASS`.
@@ -46,7 +48,7 @@ jq -R -s --argjson m '["phrase one","phrase two"]' \
   'split("\n") as $lines
    | $m
    | map(. as $needle | select([$lines[] | select(contains($needle))] | length == 0))
-   | if length == 0 then "PASS" else "FAIL — missing: \(.)" end' DOC.md
+   | if length == 0 then "PASS" else ("FAIL — missing: \(.)\n" | halt_error(1)) end' DOC.md
 ```
 
 `. as $needle` binds inside `map` over `$m`, where `.` is a marker. The inner `select` then has
