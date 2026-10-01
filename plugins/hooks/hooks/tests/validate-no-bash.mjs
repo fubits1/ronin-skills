@@ -129,6 +129,15 @@ add("sed 5p f", "BLOCK", "sed-read", false, "sed Np");
 add("sed s/a/b/ f", "ALLOW", null, false, "sed substitution");
 add("sed 's/a/b/g' f", "ALLOW", null, false, "sed substitution quoted");
 
+// 3b) perl is banned outright; sed -i stays the sanctioned in-place edit
+add("perl -ne 'print if /x/' f", "BLOCK", "bash-perl", false, "perl -ne");
+add("perl -lne 'print' f", "BLOCK", "bash-perl", false, "perl cluster");
+add("perl -pi -e 's/a/b/' f", "BLOCK", "bash-perl", false, "perl in-place");
+add("perl -e 'print 1'", "BLOCK", "bash-perl", false, "perl -e script");
+add("/usr/bin/perl -ne 'x' f", "BLOCK", "bash-perl", false, "perl abs path");
+add("sed -i 's/a/b/' f", "ALLOW", null, false, "sed in-place");
+add("ruby script.rb", "ALLOW", null, false, "ruby not banned");
+
 // 4) git mutate (BLOCK) vs read/inspection (ALLOW)
 for (const m of [
   "commit -m x",

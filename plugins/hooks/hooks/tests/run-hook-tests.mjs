@@ -8,6 +8,8 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { checkAbsolutePaths } from "../no-absolute-paths.mjs";
 import { planDirective } from "../force-plan-mode.mjs";
 import { formatterFor, formatterSpec } from "../fix-formatting.mjs";
@@ -101,6 +103,39 @@ ok(
   nap4.code === 2,
   "subprocess: PWD fallback (no CLAUDE_PROJECT_DIR) → exit 2",
 );
+// stdin `cwd` follows Bash `cd`: from outside root, the absolute root is the only way back
+const nap5 = runHook(
+  "no-absolute-paths.mjs",
+  { cwd: "/elsewhere/tmp", tool_input: { command: `cd ${ROOT}` } },
+  { CLAUDE_PROJECT_DIR: ROOT },
+);
+ok(nap5.code === 0, "subprocess: shell outside root, cd back → exit 0");
+const nap6 = runHook(
+  "no-absolute-paths.mjs",
+  { cwd: `${ROOT}/src`, tool_input: { command: `ls ${ROOT}/a` } },
+  { CLAUDE_PROJECT_DIR: ROOT },
+);
+ok(nap6.code === 2, "subprocess: shell under root → exit 2");
+const nap7 = runHook(
+  "no-absolute-paths.mjs",
+  { cwd: `${ROOT}-other`, tool_input: { command: `ls ${ROOT}/a` } },
+  { CLAUDE_PROJECT_DIR: ROOT },
+);
+ok(nap7.code === 0, "subprocess: sibling dir sharing the root prefix → exit 0");
+{
+  // stdin `cwd` arrives symlink-resolved, the root stays logical: a shell AT the root still blocks
+  const logicalRoot = mkdtempSync(join(tmpdir(), "nap-"));
+  const nap8 = runHook(
+    "no-absolute-paths.mjs",
+    {
+      cwd: realpathSync(logicalRoot),
+      tool_input: { command: `ls ${logicalRoot}/a` },
+    },
+    { CLAUDE_PROJECT_DIR: logicalRoot },
+  );
+  rmSync(logicalRoot, { recursive: true });
+  ok(nap8.code === 2, "subprocess: shell at symlinked root → exit 2");
+}
 
 console.log("=== force-plan-mode ===");
 ok(planDirective("/plan") !== null, "/plan → directive");

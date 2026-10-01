@@ -26,16 +26,16 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 
 1. **[fff](https://fff.dmtrkovalenko.dev/) MCP** — first choice for any file search or content grep inside a git-indexed directory. Frecency-ranked results (frequent/recent files first, dirty files boosted), git-aware, constraint-aware. See README.md → "fff instead of grep/bash etc.".
 2. **Built-in `Grep` / `Read` / `Glob`** — fallback when fff isn't installed or the search target lies outside the git tree. `Read` is present on every build. The `Grep` and `Glob` tools were removed on native macOS/Linux builds in Claude Code 2.1.117 (replaced by Bash `ugrep`/`bfs`, which return raw dumps this hook routes away from); on those builds fff is the structured search path. Windows and npm-installed builds keep `Grep`/`Glob`.
-3. **Bash** — only for the legitimate uses listed at the bottom of this skill.
+3. **Bash** — only for the legitimate uses listed at the bottom of this skill. Search exception: a native build with fff down has no structured search left. Ask the user to set `NO_BASH_SEARCH_FALLBACK=1` (settings.json `env`); once set, plain `grep`/`find` pass.
 
 ### For JSON parsing / shaping
 
 1. **`jq`** — first choice for any JSON work: reshaping API output, extracting fields, building hook input fixtures, constructing test payloads. Shorter than `node -e` / `python -c`, no quoting hell, no subprocess-bypass risk. (Add `Bash(jq:*)` to `permissions.allow` to skip the prompt.)
-2. **`node -e` / `python -c`** — fallback only when the logic needs language features jq lacks (complex control flow, regex flavors, library calls). NEVER for shelling out — hook blocks subprocess APIs.
+2. **`node -e` / `python -c`** — fallback only when the logic needs language features jq lacks (complex control flow, regex flavors, library calls). NEVER for shelling out — hook blocks subprocess APIs. NEVER as a file reader either: an interpreter one-liner that loops over a file is a `grep`/`head` substitute, not a language feature.
 
 ## The Rule
 
-**Never use Bash for reading or searching files.** Both fff and the built-in tools cover every case including multiline, context lines, counting, and pagination.
+**Never use Bash for reading or searching files.** Both fff and the built-in tools cover every case including multiline, context lines, counting, and pagination. Sole exception: item 3 above.
 
 ## Mapping Table
 
@@ -58,6 +58,9 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 | `awk '/pat/ {print}' file` | `mcp__fff__grep` `query: "file pat"` | **Grep** `pattern: "pat"`, `path: "file"` (or **Read**) |
 | `ls dir/` (listing) | `mcp__fff__find_files` `query: "dir/"` | **Glob** `pattern: "dir/*"` |
 | `wc -l file` | n/a (use built-in) | **Grep** `pattern: "."`, `output_mode: "count"`, `path: "file"` |
+| `perl -ne 'print if /pat/' file` | `mcp__fff__grep` `query: "file pat"` | **Grep** `pattern: "pat"`, `path: "file"` |
+| `perl -ne 'print if $. >= 50' file` | n/a (use built-in) | **Read** `offset: 50` |
+| `perl -pi -e 's/a/b/' file` | n/a | **Edit** — or `sed -i 's/a/b/' file` (GNU) / `sed -i '' 's/a/b/' file` (macOS) when a `Write\|Edit` formatter hook would reflow the file |
 
 ## fff Core Rules
 
@@ -111,6 +114,7 @@ These are legitimate Bash uses — either they have no dedicated tool equivalent
 - **build/dev tools**: `mvn`, `npx`, `pnpx`, etc.
 - **Process management**: `lsof`, `kill`, `pkill`
 - **File mutations**: `mkdir`, `cp`, `git mv`
+- **In-place text edits**: `sed 's///'`, `sed -i 's///'` — the hook passes these deliberately (`perl -pi` does NOT; `perl` is banned). Prefer `Edit`; reach for `sed -i` when `Edit` would be worse, e.g. a formatter hook on `Write|Edit` would reflow the whole file and bury a one-line change
 - **Environment**: `which`, `java -version`
 - **`jq`** — first-class JSON tool (see "For JSON parsing / shaping" above). Use it. (Add `Bash(jq:*)` to `permissions.allow` to skip the prompt.)
 - **`node -e` / `python -c`** — allowed only for in-process logic (math, control flow). NOT for shelling out to banned tools via Node's subprocess APIs or Python's subprocess module. The hook hard-blocks the shell-out case. For JSON, prefer `jq`.
@@ -120,7 +124,7 @@ These are legitimate Bash uses — either they have no dedicated tool equivalent
 
 A `BLOCKED` line from this hook is a **deterministic environment rejection — NOT the user rejecting you.** The block message says so explicitly. Do not narrate it as "the user rejected my command"; the user did not act. Read the `reason=` field, switch to the dedicated tool, and never re-issue the same blocked command unchanged — it will fail identically.
 
-Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. If the message names `Grep` or `Glob` and that tool is not in this session, it was removed on native macOS/Linux builds in 2.1.117; use fff (`mcp__fff__grep` / `mcp__fff__find_files`) or `Read` instead, and still do not fall back to Bash. Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, or a node/python shell-out — the hook catches those too. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/no-bash.mjs`, not a loophole to exploit.
+Switch to the dedicated tool (Grep / Read / Glob / fff / jq) — that is the fix. If the message names `Grep` or `Glob` and that tool is not in this session, it was removed on native macOS/Linux builds in 2.1.117; use fff (`mcp__fff__grep` / `mcp__fff__find_files`) or `Read` instead, and still do not fall back to Bash (sole exception: Tool Preference Order, item 3). Don't route around the block with `command`, an absolute path, `\grep`, `xargs`, `bash -c`, a node/python shell-out, or `perl` in any form — the hook catches those too. `perl` is banned outright (`reason=bash-perl`): a `perl -ne 'print if /pat/'` written after a `grep` block is the same reflex wearing a different binary. For in-place edits use `Edit`, or `sed -i 's///'` (macOS: `sed -i '' 's///'`) where a formatter hook would reflow the file. It also evaluates each segment of a compound command separately, so hiding a banned tool after `;` `&&` `||` `|` `&`, inside a subshell `(grep …)`, a brace group `{ grep …; }`, a process substitution `<(grep …)`, or a command substitution `$(grep …)` is blocked all the same. And it blocks gratuitous chaining (`&&`/`||`/`;` joining two commands) — run each as a separate Bash call. A bypass is a bug to fix in `plugins/hooks/hooks/no-bash.mjs`, not a loophole to exploit.
 
 ## git Commands (permission routing)
 

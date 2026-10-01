@@ -15,7 +15,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc";
+const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc|perl";
 const WRAP =
   "((timeout|time|nice|nohup|stdbuf|env|exec|eval|builtin|xargs)\\s+(-\\S+\\s+|[0-9]+\\s+)*)?([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*";
 const PATHQ = "(\\\\?[A-Za-z0-9_./-]*/)?";
@@ -77,6 +77,14 @@ const RE_SED_NP =
 // on every build. Centralized so the seven messages below can't drift apart.
 const SEARCH_FALLBACK =
   "Read for reads; the Grep/Glob tool where present, or the fff MCP (mcp__fff__grep / mcp__fff__find_files) on native macOS/Linux builds where 2.1.117 removed Grep/Glob";
+/**
+ * NO_BASH_SEARCH_FALLBACK hint
+ *
+ * worded for the setting both on and off: git grep / perl stay blocked while it is on, so the hint
+ * names plain grep/find instead of asking the user to set a variable that is already set
+ */
+const BASH_SEARCH_FALLBACK_HINT =
+  "If neither is available in this session, Bash search is the one fallback: with NO_BASH_SEARCH_FALLBACK=1 set (settings.json env), plain grep/find pass through to the embedded ugrep/bfs; if it is not set, ask the user to set it. Do not work around the block any other way.";
 
 const MSG = {
   "node-shellout": `Use the dedicated tool (${SEARCH_FALLBACK}) instead of shelling out to a subprocess API from inside an embedded JS script.`,
@@ -94,8 +102,7 @@ const MSG = {
     "Use the Write tool to create files, not 'cat > file' / heredocs. Write shows a diff and its approval caches; heredoc content is unique and re-reviewed every time. See claude-code#19649.",
   "cat-read":
     "Use the Read tool instead of Bash cat. Read supports: offset, limit (for head/tail behavior). Line numbers included by default.",
-  "bash-find":
-    "Use the Glob tool instead of Bash find. Glob supports: pattern (e.g. '**/*.ts', '**/*test*'). On native macOS/Linux builds the Glob tool was removed in 2.1.117; use the fff MCP (mcp__fff__find_files) instead.",
+  "bash-find": `Use the Glob tool instead of Bash find. Glob supports: pattern (e.g. '**/*.ts', '**/*test*'). On native macOS/Linux builds the Glob tool was removed in 2.1.117; use the fff MCP (mcp__fff__find_files) instead. ${BASH_SEARCH_FALLBACK_HINT}`,
   "sed-read":
     "Use the Read tool instead of Bash sed for reading file ranges (-n / Np / N,Mp / $p). Read supports: offset, limit.",
   "bash-awk":
@@ -109,7 +116,7 @@ function block(tag, message) {
   return { tag, msg: message || MSG[tag] };
 }
 function grepMessage(tool) {
-  return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep) instead, which returns structured, frecency-ranked results.`;
+  return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep) instead, which returns structured, frecency-ranked results. ${BASH_SEARCH_FALLBACK_HINT}`;
 }
 function readMessage(tool) {
   return `Use the Read tool instead of Bash ${tool}. Read supports: offset (start line), limit (number of lines).`;
@@ -303,7 +310,17 @@ function splitSegments(text) {
   return output;
 }
 
-export function scan(command) {
+/**
+ * bashSearchAllowed lets grep/find through (NO_BASH_SEARCH_FALLBACK=1, read in main())
+ *
+ * the one case where blocking search leaves no allowed way to search: a native macOS/Linux build
+ * (2.1.117 removed the Grep/Glob tools) with the fff MCP unavailable. there, Bash `grep`/`rg`/`find`
+ * are Claude Code's embedded search (the shell snapshot replaces the names, see no-bash.md), so
+ * they are the only search left. the hook cannot detect fff on its own (stdin carries no tool
+ * list, and there is no tool-availability API), so the user switches it on in settings.json `env`.
+ * reads stay blocked either way: `Read` is present on every build
+ */
+export function scan(command, bashSearchAllowed = false) {
   if (typeof command !== "string" || command === "") return null;
 
   if (RE_NODE_SHELLOUT.test(command)) return block("node-shellout");
@@ -337,6 +354,7 @@ export function scan(command) {
       FIRST === "fgrep" ||
       FIRST === "rg"
     ) {
+      if (bashSearchAllowed) continue;
       return block("bash-" + FIRST, grepMessage(FIRST));
     }
     if (FIRST === "cat") {
@@ -349,10 +367,23 @@ export function scan(command) {
     if (FIRST === "head" || FIRST === "tail") {
       return block("bash-" + FIRST, readMessage(FIRST));
     }
-    if (FIRST === "find") return block("bash-find");
+    if (FIRST === "find") {
+      if (bashSearchAllowed) continue;
+      return block("bash-find");
+    }
     if (FIRST === "sed") {
       if (RE_SED_N.test(SUB) || RE_SED_NP.test(SUB)) return block("sed-read");
       continue;
+    }
+    // `perl` is banned outright, unlike `sed`: a one-liner is a grep/cat substitute the model
+    // reaches for once the named readers block, and no workflow here needs it — `sed -i 's///'`
+    // covers in-place editing. Enumerating interpreters cannot close the class (claude-code#40408);
+    // this closes the one the agent actually reaches for.
+    if (FIRST === "perl") {
+      return block(
+        "bash-perl",
+        `${grepMessage("perl")} For in-place edits use the Edit tool, or sed -i 's///' (GNU) / sed -i '' 's///' (macOS).`,
+      );
     }
     if (FIRST === "awk") return block("bash-awk");
     if (FIRST === "wc") return block("bash-wc");
@@ -378,7 +409,8 @@ function main() {
   }
   const command = input?.tool_input?.command;
   if (typeof command !== "string" || command === "") return; // empty/absent/non-string: fail open
-  const hit = scan(command);
+  // the hook's own env, not the command: a `NO_BASH_SEARCH_FALLBACK=1 grep …` prefix does not count
+  const hit = scan(command, process.env.NO_BASH_SEARCH_FALLBACK === "1");
   if (hit) {
     process.stderr.write(
       `[deterministic hook block from no-bash.mjs — NOT a user rejection] BLOCKED | reason=${hit.tag}\n`,
