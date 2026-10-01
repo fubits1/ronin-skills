@@ -7,7 +7,8 @@ code.
 ## Runtime: `no-bash.mjs` (Node, cross-OS)
 
 The hook is **`no-bash.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
-`node ${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs`. It runs on every OS because Claude Code ships Node
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs"` (quoted: the shell would split a plugin root
+that contains a space). It runs on every OS because Claude Code ships Node
 everywhere — a shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows
 plugin paths in any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed
 not-planned).
