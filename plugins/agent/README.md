@@ -1,6 +1,6 @@
 # agent
 
-Claude Code plugin for framework-agnostic AI coding agent discipline. Sixteen skills covering research rigor, pre-action safety checks, structured planning, completion verification, day-to-day execution discipline (git safety, dev-server lifecycle, command obedience, correction-taking, supply-chain checks, CI workflow), communication discipline, and a meta-skill for syncing skill collections.
+Claude Code plugin for framework-agnostic AI coding agent discipline. Seventeen skills covering research rigor, pre-action safety checks, structured planning, completion verification, external verification of handed-over work, day-to-day execution discipline (git safety, dev-server lifecycle, command obedience, correction-taking, supply-chain checks, CI workflow), communication discipline, and a meta-skill for syncing skill collections.
 
 > The matching enforcement hooks ship separately in the optional `hooks` plugin.
 
@@ -28,6 +28,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 | `socket` | Supply-chain checks via Socket.dev — score evaluation before installing, project scans |
 | `tea` | "Coffee or tea? YES." — triggers when Claude offers an X-or-Y choice instead of just doing the work |
 | `update-skills` | Reconcile two skill collections — backport from a source dir into a marketplace, with proprietary-reference scrubbing |
+| `verify-externally` | Prove a check works by watching it fail on a scratch copy, then send cold readers (one on a different model) over work someone else must act on |
 
 ## Hooks
 
