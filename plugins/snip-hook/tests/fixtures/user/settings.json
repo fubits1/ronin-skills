@@ -1,0 +1,7 @@
+{
+  "_comment": "User-scope fixture (selected via CLAUDE_CONFIG_DIR): its allow rules may grant.",
+  "permissions": {
+    "allow": ["Bash(git log:*)"],
+    "deny": ["Bash(gh repo delete *)"]
+  }
+}

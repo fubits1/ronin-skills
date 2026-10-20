@@ -6,12 +6,17 @@ code.
 
 ## Runtime: `no-bash.mjs` (Node, cross-OS)
 
-The hook is **`no-bash.mjs`**, a zero-dependency Node ESM script wired in `hooks.json` as
-`node "${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs"` (quoted: the shell would split a plugin root
-that contains a space). It runs on every OS because Claude Code ships Node
-everywhere — a shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows
-plugin paths in any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed
-not-planned).
+The hook is **`no-bash.mjs`**, a Node ESM script with no runtime dependencies wired in `hooks.json`
+as `node "${CLAUDE_PLUGIN_ROOT}/hooks/no-bash.mjs"` (quoted: the shell would split a plugin root
+that contains a space). The hook runs on every OS because Claude Code ships Node everywhere — a
+shell plugin hook cannot run on native Windows (`/bin/bash` can't resolve Windows plugin paths in
+any format; [#18610](https://github.com/anthropics/claude-code/issues/18610), closed not-planned).
+
+The file is generated: `pnpm build` (rolldown, repository root) bundles `src/no-bash.js` with the
+shared shell parser `shared/shell.js` and unbash into it, and CI fails when the committed copy
+differs from its sources. Edit the sources, never the generated file. `shared/shell.js` is also
+the snip-hook plugin's parser, so a change there rebuilds and changes both hooks; `pnpm test` runs
+its tests and snip-hook's.
 
 Block mechanism: `exit 2` + a stderr message
 ([#24327](https://github.com/anthropics/claude-code/issues/24327) is a model-side stop-vs-adapt quirk
@@ -84,31 +89,49 @@ The hook disciplines a well-meaning agent's habits toward the right tools — it
 or an adversarial sandbox. It catches the model's plain reflexes: a banned tool as the command, a
 `cat > file` heredoc, mutating git, gratuitous chaining, and a banned tool wrapped in `bash -c "…"`,
 `$(…)`, backticks, `<(…)`, or a simple process wrapper (`timeout`, `nice`, `env`, `xargs`). It does
-NOT chase deliberate evasion — quote/escape mutation (`'grep'`, mid-name backslash, ANSI-C `$'…'`),
-encoding, expansion, or a tool hidden inside an arbitrary construct — because the model has no reason
+NOT chase deliberate evasion — encoding, a command built at run time (`eval "$x"`, a script
+written then run) — because the model has no reason
 to obfuscate its own command to slip past its own discipline hook. Claude Code's own
 guidance is to use the permission system or sandbox for hard boundaries and treat hooks as
 best-effort policy that fails open on unparseable input
-([hooks docs](https://code.claude.com/docs/en/hooks)). For a nudge, a regex matcher with zero
-runtime dependencies is the right trade.
+([hooks docs](https://code.claude.com/docs/en/hooks)). The command is parsed the way bash parses
+it (unbash, see "How it works"), so quoting that bash itself removes (`'grep'`, `'g''rep'`,
+`$'\x67rep'`) resolves to the real command as a side effect; no code chases it.
 
 ## How it works
 
 1. Read input by parsing stdin JSON for `.tool_input.command`; empty means exit 0 (fail open).
-2. Pre-extraction scans catch banned tools the segment splitter can't see: `bash -c "…"`,
-   `$(…)` and backtick command substitution, `<(…)`/`>(…)` process substitution, and
-   `node -e`/`python -c` shelling out via subprocess APIs.
-3. Segment split on `&&`, `||`, `;`, `|`, and background `&`, with `&&` matched before bare
-   `&` so a logical-AND isn't mis-split. Each segment is checked on its own, so a banned
-   tool can't ride along after an approved-looking first command.
-4. `normalize_first` reduces a segment to its effective first word, mirroring Claude Code's
-   own matcher: it strips `VAR=value` prefixes, leading group-openers (`(` / `{`), leading
-   backslash, path qualification, and process wrappers (`timeout`, `nice`, `env`, `exec`,
-   `xargs` — including the `-I {}` replstr of the `xargs -I {} grep …` idiom).
-5. Per-tool arms block the banned first word with a message naming the right tool. Special
+2. Parse: [unbash](https://github.com/webpro-nl/unbash) (a bash parser in pure JS, through
+   `shared/shell.js`) turns the command into every simple command bash would run, each with
+   where it runs: the command line itself (pipelines, `&&`/`||`/`;`/`&` lists, subshells,
+   groups, loops), `$(…)`, backticks, `<(…)`/`>(…)`, or a script handed to a shell
+   (`bash -c "…"`, `bash -euo pipefail -c "…"`, `sh <<EOF`, `bash <<< '…'`, `bash -s arg <<EOF`; a
+   shell's stdin is a script only with `-s` or when it has no `-c` and names no script file, so
+   the stdin of `bash setup.sh <<EOF` is data). A redirect on
+   a subshell or group applies to the commands inside it (`(cat a) > out` writes a file).
+   Quotes, escapes, `\`-continuations and heredoc
+   bodies resolve as bash resolves them, so a banned word inside a quoted argument stays an
+   argument. A command that runs on another machine or in a container (`ssh host 'echo $(cat f)'`,
+   `docker exec c sh -c "grep …"`) is an argument to `ssh`/`docker` and passes: `Read` and
+   `Grep` can't reach those files. `node -e`/`python -c` bodies aren't shell; two regexes catch
+   them shelling out via subprocess APIs.
+3. Each command is checked on its own, so a banned tool can't ride along after an
+   approved-looking first command. Nested commands are checked first (shell scripts, then
+   `$(…)`, backticks, process substitution), and a banned file-read/search tool there reports
+   with that construct's tag (`bashc-banned`, `dollar-sub`, `backtick-sub`, `procsub`). A sed
+   read in a shell script is `bashc-sed-read`; mutating git, `command <tool>` and a sed read in
+   a substitution keep their own tag.
+4. `readCommand` reduces each command to its effective command, mirroring Claude Code's own
+   matcher: it strips `VAR=value` prefixes and process wrappers (`timeout`, `time`, `nice`,
+   `nohup`, `stdbuf`, `env`, `exec`, `eval`, `builtin`, `xargs`), with their flags and the
+   values of flags that take one (`xargs -I % grep`, `xargs -d '\n' grep`, `timeout -s KILL 5
+   grep`, `env -u FOO grep`). The
+   parser has already removed quoting and a leading backslash; the path qualification is
+   dropped from the name.
+5. Per-tool arms block the banned command with a message naming the right tool. Special
    cases discriminate read from write, so the hook does not false-positive on a legit read:
-   - `cat` routes to `Write` only for a real stdout file-write (`cat … > f`, `>>`) or a
-     heredoc (`<<EOF`); a stderr redirect (`2>/dev/null`, `2>&1`, `1>&2`) or a `<<<`
+   - `cat` routes to `Write` only for a real stdout file-write (`cat … > f`, `>>`, `&>`) or
+     a heredoc (`<<EOF`); a stderr redirect (`2>/dev/null`, `2>&1`, `1>&2`) or a `<<<`
      here-string is still a read and routes to `Read`.
    - `sed -n`/`Np` reads block while `sed 's///'` substitution passes.
    - `perl` gets no such split: it blocks in every form (`reason=bash-perl`), in-place `-pi`
@@ -126,13 +149,15 @@ runtime dependencies is the right trade.
      forms `git config user.name …` / `git tag v1`): they are local, non-destructive, and
      have no `gh` equivalent, so the read-only `--get`/`-l` forms — the common reflex — must
      pass and blocking the write forms buys nothing.
-6. No-chaining check (runs after the per-tool arms, so a banned-tool message wins). It counts
-   the top-level commands quote/heredoc/continuation aware: a real `&&`, `||`, `;`, or a bare
-   newline BETWEEN commands counts as chaining and blocks with a message telling Claude to run
+6. No-chaining check (runs after the per-tool arms, so a banned-tool message wins). From the
+   parse: a real `&&`, `||`, `;`, or a bare newline BETWEEN commands, or a loop, `if`, `case`
+   or function definition, counts as chaining and blocks with a message telling Claude to run
    each as a separate Bash call. A newline INSIDE a quoted argument (a multi-line `--body`/`-m`
-   value), a `\`-newline line-continuation, and a heredoc body are one logical command and do
-   NOT count. Chaining is a documented permission-bypass class (claude-code
-   #13371/#4956/#28784/#16180/#20085): the native matcher can validate only the first segment
+   value), a `\`-newline line-continuation, a heredoc body, and a script inside `bash -c "…"`
+   are one logical command and do NOT count. One command sent to the background
+   (`npm run dev &`) doesn't count; `a & b` and `a &⏎b` do. Chaining is
+   a documented permission-bypass class (claude-code #13371/#4956/#28784/#16180/#20085): the
+   native matcher can validate only the first segment
    of a chain. It's also the agent's bash-one-liner reflex, not a need; Claude Code persists
    the Bash working dir across calls, so even `cd dir && cmd` is unnecessary. Pipes into `jq`
    and redirections (`>`, `2>&1`) are not chaining and pass.
@@ -142,27 +167,29 @@ A bypass that slips a banned tool through is a bug to fix here, not a loophole t
 ## Coverage, as a fraction
 
 The reflex this hook targets is "reach for a Bash reader instead of the dedicated tool", and that
-reflex is not tied to the names in `BANNED` — it moves to whatever binary is left. The table
+reflex is not tied to the names the arms block — it moves to whatever binary is left. The table
 is the current score, so the next gap is visible rather than discovered mid-session. `GUARDED`
 names the arm that catches the shape; `GAP` is a deliberate non-goal under the threat model above.
 
 | Shape | Verdict | Where |
 | --- | --- | --- |
 | `grep` / `rg` / `cat` / `head` / `tail` / `find` / `awk` / `wc` | GUARDED | per-tool arms |
-| `sed -n` / `sed Np` read | GUARDED | `RE_SED_N` / `RE_SED_NP` |
+| `sed -n` / `sed Np` read | GUARDED | `sed` arm: a `-n` token or a `SED_PRINT_RANGE` script |
 | `sed 's///'` edit | passes by design | `sed` arm falls through |
-| `perl`, every form | GUARDED | in `BANNED` + its own arm, `reason=bash-perl` |
+| `perl`, every form | GUARDED | its own arm, `reason=bash-perl` |
 | `sed -i 's///'` (GNU), `sed -i '' 's///'` (macOS) | passes by design | the sanctioned in-place edit, and what replaces `perl -pi`; BSD sed reads the argument after `-i` as the backup suffix |
 | `ruby`, `lua`, `php`, `busybox`, `xxd` | GAP | zero observed use here; add one only when a replay shows the reflex, never on symmetry |
-| banned tool via wrapper, `$(…)`, backticks, `<(…)`, `bash -c` | GUARDED | pre-extraction scans |
-| `/usr/bin/grep`, `\grep`, `VAR=x grep` | GUARDED | `normalizeFirst` |
-| `bash -c "perl …"`, `$(perl …)`, `` `perl …` ``, `<(perl …)` | GUARDED | `perl` is in `BANNED`, so every pre-extraction scan covers it |
+| banned tool via wrapper, `$(…)`, backticks, `<(…)`, `bash -c`, `sh <<EOF` | GUARDED | the parse finds nested commands; the arms check them like top-level ones |
+| `/usr/bin/grep`, `\grep`, `VAR=x grep` | GUARDED | the parse + `readCommand` |
+| `bash -c "perl …"`, `$(perl …)`, `` `perl …` ``, `<(perl …)` | GUARDED | nested commands go through the same arms |
+| banned tool on another host or in a container (`ssh h 'cat f'`, `docker exec c sh -c "grep …"`) | passes by design | an argument to `ssh`/`docker`, not a local command; `Read`/`Grep` can't reach those files |
 | `python -c "open(f).read()"`, `node -e "fs.readFileSync"` | GAP | both have real non-reader uses here (`jq` fallback, scripts); no reader-shaped instance in the replay. Revisit from evidence, not symmetry |
-| `ugrep`, `bfs` | pass, unrecommended | they pass (not in `BANNED`, no arm) and stay that way — no observed reflex to block. They are also not recommended: "the raw-dump search this hook routes away from", below |
+| `ugrep`, `bfs` | pass, unrecommended | they pass (no arm) and stay that way — no observed reflex to block. They are also not recommended: "the raw-dump search this hook routes away from", below |
 | `grep` / `find` on a native build | GUARDED, unless the user opts in | on native macOS/Linux these names ARE the embedded ugrep/bfs (the shell snapshot shadows them). Blocked by default; `NO_BASH_SEARCH_FALLBACK=1` lets them through — see below |
 | `tee`, `dd of=`, heredoc into a non-`cat` command | GAP | write-side routing beyond `cat > file` is out of scope — `tee … <<EOF` is an explicit ALLOW in `redteam-no-bash.mjs` |
 | write a script, then run it | GAP | one indirection defeats any string-level analysis; that belongs to sandboxing, not to a nudge |
-| obfuscation: `'g''rep'`, `$'\x67rep'`, encoded payloads | GAP | documented non-goal, see the threat model |
+| quoting: `'grep'`, `'g''rep'`, `$'\x67rep'` | GUARDED, as a side effect | the parser removes quoting like bash does; nothing chases it |
+| obfuscation: encoded payloads, `eval "$(…)"` built at run time | GAP | documented non-goal, see the threat model |
 
 The `perl` row exists because the gap was observed, not imagined. In one session the hook blocked
 `grep`, `head` and `tail` as designed, and the agent read files with `perl -ne 'print if /…/'` for
@@ -244,18 +271,47 @@ properties:
   (`grep '' f`, `find … -exec cat {} \;`). The hook does not try to catch that; an agent does not
   write these to get around the hook (see the threat model).
 - **Not self-grantable.** The hook reads its own `process.env`, so a `NO_BASH_SEARCH_FALLBACK=1 grep …`
-  prefix on the command does not enable it; `normalizeFirst` strips the assignment and the arm
+  prefix on the command does not enable it; `readCommand` strips the assignment and the arm
   blocks as usual. Only the user, via settings, can open it.
-- **Direct invocations only.** The pre-extraction scans (`$(grep …)`, `bash -c "grep …"`, backticks,
-  process substitution) still block, because those regexes compose `BANNED` as a whole and cannot
-  discriminate a search tool from a reader.
+- **Direct invocations only.** A search nested in `$(grep …)`, `bash -c "grep …"`, backticks or
+  process substitution still blocks. The setting covers the command line only, as it did when
+  these were regex scans that could not tell a search tool from a reader.
 
 ## Limits
 
-- regex, not a parser. A real bash AST parser
+- a parser, bundled. The hook was regex-only because a real bash AST parser
   ([oryband/claude-code-auto-approve](https://github.com/oryband/claude-code-auto-approve),
-  shfmt + jq) is more robust per-segment but needs `shfmt` installed. This hook stays
-  regex-only with zero runtime dependencies (stdin parsed with `JSON.parse`), which fits the nudge threat model
+  shfmt + jq) needs `shfmt` installed. unbash is pure JS, so `pnpm build` bundles it into
+  `no-bash.mjs` and the hook still has no runtime dependencies. The switch replaced the
+  hand-written splitter, chain counter, wrapper stripper and the `$(…)`/backtick/`<(…)`/`bash -c`
+  regexes. Every existing fixture passed unchanged. A replay of 10,781 distinct real Bash
+  commands from local transcripts (2026-10-18) through the old and the new hook gave the same
+  verdict for 10,759. Of the 22 that changed, 19 now pass because they run on another host or in a container
+  (`ssh h '… $(cat …)'`, `ssh h 'bash -s' <<'EOF'`, `docker exec c sh -c "grep …"`). One
+  multi-line `node -e '…'` script that the old splitter miscounted as several commands now
+  passes. One `node -e "…"` with backticks inside double quotes now blocks as chaining, because
+  bash does run those backticks as commands. One `$(… grep …)` reports `dollar-sub` instead of
+  `bash-grep`. Cost: Node loads a ~211kB bundle, 1.5–3.8ms more per call in
+  `bench-no-bash.mjs` (cold-start medians of 29.4–31.7ms across four runs, vs 27.9ms before);
+  the large-input worst case is 97.4–105.4ms across those runs (102.8ms before), about 2% of the
+  5000ms hook timeout
+- what the parse changes, as classes (each a case in `redteam-no-bash.mjs` or seen in the replay):
+  - newly blocked, because bash runs it: a banned tool or mutating git behind a wrapper, a path
+    or a wrapper flag's value (`timeout 60 git push`, `/usr/bin/git commit`, `! grep`,
+    `xargs -I % grep`, `timeout -s KILL 5 grep`), git behind a quoted or unlisted global option
+    (`git -C "/my repo" push`, `git --no-optional-locks commit`), a banned tool anywhere in a
+    `bash -c` script, a here-string fed to a shell or a substitution (`bash -c "cd x && grep y"`,
+    `bash <<< 'cat f'`, `x=$(sed -n 1p f)`), a `;`/`&&`/`||` inside a substitution
+    (`echo "$(cd sub && pwd)"`), and `a & b`
+  - newly allowed, because bash doesn't run it: tool names inside quoted text (`` '`cat f`' ``,
+    `'$(grep x)'`), heredoc bodies fed to a command that isn't a shell, the stdin of a shell that
+    runs `-c` or a script file, `#` comments, `[[ a && b ]]`
+  - same block, new tag: `cat … &> file` and `{ cat a; } >> out` are `cat-write` (were
+    `cat-read`), a heredoc script fed to a shell is `bashc-banned`, and a loop, `if` or `case`
+    around a banned tool reports the tool's tag, not `chaining`
+- unbash parses GNU Bash; the Bash tool runs the user's shell (zsh on macOS), so zsh-only
+  syntax may parse differently. A parse error never blocks by itself: the commands unbash could
+  read are still checked
 - adversarial evasion is out of scope by design (see threat model)
 
 ## Sources

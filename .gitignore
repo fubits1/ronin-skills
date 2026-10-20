@@ -1,3 +1,6 @@
 .DS_Store
 .dex
 .skill-evals/
+node_modules/
+# test fixture, not a real local settings file (often ignored globally)
+!plugins/snip-hook/tests/fixtures/project/.claude/settings.local.json

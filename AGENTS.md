@@ -4,11 +4,11 @@ Guidance for AI agents working **on this repository**. The binding behavioral ru
 
 ## What this repo is
 
-`ronin-skills` is a marketplace of **discipline skills + optional enforcement hooks for AI coding agents**. The product *is* agent discipline. The hooks (`plugins/hooks/hooks/`) are **DISCIPLINE NUDGES, not a firewall** — verbatim from `no-bash.md`: *"it is not a firewall or an adversarial sandbox."* Their threat model is a **well-meaning agent producing plain commands; there is NO adversary** (`no-bash.mjs`: *"the model produces these commands plainly and has no reason to obfuscate them to evade its own discipline hook"*).
+`ronin-skills` is a marketplace of **discipline skills + optional enforcement hooks for AI coding agents**. The product *is* agent discipline. The hooks (`plugins/hooks/hooks/`) are **DISCIPLINE NUDGES, not a firewall** — verbatim from `no-bash.md`: *"it is not a firewall or an adversarial sandbox."* Their threat model is a **well-meaning agent producing plain commands; there is NO adversary** (`plugins/hooks/src/no-bash.js`, the source of the generated `no-bash.mjs`: *"the model produces these commands plainly and has no reason to obfuscate them to evade its own discipline hook"*).
 
 ## Prime directive: ground every change in the documented purpose
 
-Before editing any hook or skill, read its rationale (the file header, plus `no-bash.md` / `no-honest.md`). **A change is valid only if you can cite the line of documented purpose it serves.** If you can't, don't make it. The threat model is the spec — not your intuition about what *could* go wrong.
+Before editing any hook or skill, read its rationale (the file header, for no-bash in `plugins/hooks/src/no-bash.js`, plus `no-bash.md` / `no-honest.md`). **A change is valid only if you can cite the line of documented purpose it serves.** If you can't, don't make it. The threat model is the spec — not your intuition about what *could* go wrong.
 
 ## The trap this repo exists to teach (do not fall in it)
 
@@ -26,13 +26,16 @@ Commit `b3975e6` added an option-injection "RCE" guard, ReDoS regex bounds, and 
 
 ## The one contract that IS load-bearing: fail-open
 
-Every hook must **fail open**: any malformed/absent/unexpected input or internal throw → `exit 0` (a block is `exit 2`), **never** crash, hang, or break the session. This is the real reliability property — test it, never regress it. `conformance-hooks.mjs` is the harness that enforces it across all six hooks: no-bash, no-absolute-paths, force-plan-mode, fix-formatting, no-honest, and session-start.
+Every hook must **fail open**: any malformed/absent/unexpected input or internal throw → `exit 0` (a block is `exit 2`), **never** crash, hang, or break the session. This is the real reliability property — test it, never regress it. `conformance-hooks.mjs` is the harness that enforces it across all six hooks of the `hooks` plugin: no-bash, no-absolute-paths, force-plan-mode, fix-formatting, no-honest, and session-start. The `snip-hook` plugin's bundle is held to the same contract by `plugins/snip-hook/tests/index.test.js`.
 
 ## Build / test / validate
 
-Hooks are zero-dependency Node ESM. From the repo root:
+Hooks are Node ESM that load only Node built-ins at runtime. Two of them parse shell with unbash and are generated bundles: `plugins/hooks/hooks/no-bash.mjs` (from `plugins/hooks/src/no-bash.js`) and `plugins/snip-hook/dist/index.js` (from `plugins/snip-hook/src/`), both on the shared parser `shared/shell.js`. Edit the sources, run `pnpm build`, and commit the bundles with them; CI fails when a bundle differs from its sources. From the repo root:
 
 ```sh
+pnpm install
+pnpm test                                               # builds both bundles, then node:test (shared parser, snip hook)
+
 # full hook test suite
 node plugins/hooks/hooks/tests/run-no-bash-tests.mjs
 node plugins/hooks/hooks/tests/redteam-no-bash.mjs
@@ -43,7 +46,7 @@ node plugins/hooks/hooks/tests/run-hook-tests.mjs
 node plugins/hooks/hooks/tests/conformance-hooks.mjs   # fail-open + protocol contract, all hooks
 node plugins/hooks/hooks/tests/run-no-honest-tests.mjs
 
-node --check plugins/hooks/hooks/<edited>.mjs           # syntax
+node --check <edited source file>                       # syntax (for no-bash: plugins/hooks/src/no-bash.js)
 pnpx oxlint .                                            # code-style (curly, naming)
 claude plugin validate .                                # + each plugins/*/
 ```
@@ -52,6 +55,6 @@ Every hook change carries a reproducing test. Match the surrounding code's style
 
 ## Changes & releases
 
-- Conventional Commits, scope `agent` or `hooks`. See `RELEASING.md`.
+- Conventional Commits, scope `agent`, `hooks` or `snip`. See `RELEASING.md`.
 - **No version bump unbidden** — the release script owns versioning. **No commits / push / PRs unless explicitly asked.**
 - When you remove content, your next message names what and why. Cite commit hashes, never tool/model names (`agent:discipline`).

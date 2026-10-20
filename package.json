@@ -1,0 +1,19 @@
+{
+  "name": "ronin-skills",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "rolldown -c",
+    "check:bundles": "pnpm build && node scripts/check-bundles.mjs",
+    "pretest": "pnpm build",
+    "test": "node --test \"shared/**/*.test.js\" \"plugins/snip-hook/**/*.test.js\""
+  },
+  "devDependencies": {
+    "rolldown": "1.2.14",
+    "unbash": "6.0.0"
+  }
+}

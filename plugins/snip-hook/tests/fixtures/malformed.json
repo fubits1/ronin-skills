@@ -1,0 +1,7 @@
+{
+  "_comment": "B2 regression: `allow` is a number (JSON-valid, type-invalid). The hook must still enforce the valid `deny` array, not fail-open and disable everything.",
+  "permissions": {
+    "allow": 5,
+    "deny": ["Bash(gh repo delete *)"]
+  }
+}

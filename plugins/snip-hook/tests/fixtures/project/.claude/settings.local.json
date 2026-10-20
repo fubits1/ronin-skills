@@ -1,0 +1,6 @@
+{
+  "_comment": "Local-scope fixture: where Claude Code saves 'Yes, and don't ask again'. Its allow rules grant when the file is your own (untracked, .claude not a symlink).",
+  "permissions": {
+    "allow": ["Bash(make *)"]
+  }
+}

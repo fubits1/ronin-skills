@@ -1,5 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "plugins/hooks/hooks/no-bash.mjs",
+    "plugins/snip-hook/dist/"
+  ],
   "rules": {
     "curly": ["error", "multi-line"]
   }

@@ -26,6 +26,7 @@ cd "$(git rev-parse --show-toplevel)"
 [[ -f .github/workflows/release.yml ]]     || die ".github/workflows/release.yml missing"
 command -v jq >/dev/null                   || die "jq is required"
 command -v claude >/dev/null               || die "claude CLI is required"
+command -v pnpm >/dev/null                 || die "pnpm is required"
 
 TAG="v$VERSION"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
@@ -41,6 +42,13 @@ REMOTE="$(git rev-parse origin/main)"
 [[ "$LOCAL" == "$REMOTE" ]] || die "local main differs from origin/main"
 
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
+
+# the released bundles must match their sources and be committed (scripts/check-bundles.mjs); on a
+# mismatch the rebuilt bundles stay in the tree, ready to review and commit
+echo "release.sh: rebuilding and checking the bundles"
+pnpm install --frozen-lockfile >/dev/null
+pnpm check:bundles >/dev/null \
+  || die "the bundles failed to build or differ from their sources (see above)"
 
 echo "release.sh: bumping marketplace.json + plugin manifests to $VERSION"
 tmp="$(mktemp .claude-plugin/marketplace.json.XXXXXX)"

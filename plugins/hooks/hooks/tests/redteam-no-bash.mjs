@@ -260,5 +260,167 @@ expect("BLOCK", "bash-grep", "xargs-I-placeholder", "xargs -I {} grep foo {}");
 expect("BLOCK", "bashc-banned", "bashc-login-flag", 'bash -lc "grep foo file"');
 expect("BLOCK", "bashc-banned", "bashc-xtrace-flag", 'sh -xc "cat file"');
 
+console.log(
+  "\n=== Parsed like bash: redirects on groups, a shell's stdin, wrapped git, background chains ===",
+);
+expect("BLOCK", "cat-write", "subshell-redirect-write", "(cat a) > out.txt");
+expect("BLOCK", "cat-write", "group-redirect-write", "{ cat a; } >> out.txt");
+expect(
+  "ALLOW",
+  "-",
+  "script-file-stdin-is-data",
+  "bash ./setup.sh <<EOF\ny\ncat\nEOF",
+);
+expect("ALLOW", "-", "bashc-stdin-is-data", "bash -c 'read x' <<< 'find me'");
+expect("BLOCK", "bashc-banned", "shell-stdin-script", "bash <<EOF\ncat f\nEOF");
+expect(
+  "BLOCK",
+  "bashc-banned",
+  "bashc-after-option-value",
+  'bash -o pipefail -c "cat f"',
+);
+expect(
+  "BLOCK",
+  "bashc-banned",
+  "stdin-script-with-args",
+  "bash -s arg <<EOF\ncat f\nEOF",
+);
+expect(
+  "BLOCK",
+  "chaining",
+  "background-then-newline",
+  "npm run dev &\ncurl localhost:3000",
+);
+expect("ALLOW", "-", "single-background", "npm run dev &");
+expect("BLOCK", "git-mutation", "wrapped-git", "timeout 60 git push");
+expect("BLOCK", "git-mutation", "path-git", "/usr/bin/git commit -m x");
+expect("BLOCK", "bash-grep", "negated-grep", "! grep -q x f");
+expect(
+  "BLOCK",
+  "bashc-banned",
+  "bashc-tool-after-cd",
+  'bash -c "cd x && grep y f"',
+);
+expect(
+  "BLOCK",
+  "bashc-banned",
+  "bashc-after-option-cluster",
+  'bash -euo pipefail -c "cat f"',
+);
+expect("BLOCK", "sed-read", "sed-read-in-assignment", "x=$(sed -n 1p f)");
+expect(
+  "BLOCK",
+  "chaining",
+  "chain-inside-substitution",
+  'echo "$(cd sub && pwd)"',
+);
+expect("BLOCK", "chaining", "background-then-command", "sleep 1 & echo b");
+expect(
+  "BLOCK",
+  "bash-wc",
+  "tool-inside-loop",
+  'for f in *.md; do wc -l "$f"; done',
+);
+expect(
+  "ALLOW",
+  "-",
+  "backticks-in-single-quotes",
+  "echo 'use `cat f` instead'",
+);
+expect(
+  "ALLOW",
+  "-",
+  "substitution-in-single-quotes",
+  "echo 'use $(grep x) instead'",
+);
+expect(
+  "ALLOW",
+  "-",
+  "heredoc-data",
+  "gh pr create --body-file - <<'EOF'\nfind out why\nEOF",
+);
+expect("ALLOW", "-", "comment-with-separators", "ls # a; b && c");
+expect("ALLOW", "-", "test-expression-and", "[[ -f a && -f b ]]");
+expect(
+  "BLOCK",
+  "git-mutation",
+  "git-C-path-with-space",
+  'git -C "/my repo" push',
+);
+expect(
+  "BLOCK",
+  "git-mutation",
+  "git-c-value-with-space",
+  'git -c "user.name=A B" commit -m x',
+);
+expect(
+  "ALLOW",
+  "-",
+  "git-C-path-with-space-read",
+  'git -C "/my repo" log --oneline',
+);
+expect("BLOCK", "bash-grep", "xargs-replstr-value", "xargs -I % grep a %");
+expect("BLOCK", "bash-grep", "bsd-xargs-replstr-value", "xargs -J % grep a %");
+expect(
+  "BLOCK",
+  "bash-grep",
+  "bsd-env-altpath-value",
+  "env -P /usr/bin grep x f",
+);
+expect(
+  "BLOCK",
+  "bash-grep",
+  "xargs-delimiter-value",
+  "git ls-files | xargs -d '\\n' grep x",
+);
+expect(
+  "BLOCK",
+  "bash-grep",
+  "timeout-signal-value",
+  "timeout -s KILL 5 grep x f",
+);
+expect("BLOCK", "bash-grep", "env-unset-value", "env -u FOO grep x f");
+expect("BLOCK", "bash-grep", "stdbuf-mode-value", "stdbuf -o L grep x f");
+expect(
+  "BLOCK",
+  "bash-grep",
+  "stdbuf-long-mode-value",
+  "stdbuf --output L grep x f",
+);
+expect(
+  "ALLOW",
+  "-",
+  "group-stdin-not-read-by-later-pipe-stage",
+  "{ echo ls | bash; } <<EOF\ncat f\nEOF",
+);
+expect("BLOCK", "cat-read", "xargs-attached-only-flag", "xargs -i cat {}");
+expect("ALLOW", "-", "xargs-attached-only-flag-echo", "xargs -i echo cat {}");
+expect(
+  "BLOCK",
+  "bash-grep",
+  "time-output-value",
+  "/usr/bin/time -o out grep x f",
+);
+expect("BLOCK", "bash-grep", "exec-argv0-value", "exec -a foo grep x f");
+expect(
+  "BLOCK",
+  "bash-grep",
+  "git-grep-after-global-option",
+  "git -C /r grep foo",
+);
+expect(
+  "BLOCK",
+  "git-mutation",
+  "git-unlisted-global-flag",
+  "git -C /r --no-optional-locks commit -m x",
+);
+expect("BLOCK", "git-mutation", "git-no-pager-short", "git -P add .");
+expect(
+  "BLOCK",
+  "git-mutation",
+  "git-clean-flag-like-value",
+  'git clean -e "a -n" -f',
+);
+
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);

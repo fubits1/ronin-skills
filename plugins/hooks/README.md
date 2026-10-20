@@ -11,7 +11,8 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 
 > **All Node, cross-OS.** Every hook runs on Node and works on every OS Claude Code supports (native
 > Windows included) — they need only `node` on `PATH`, no `jq`/`bash`. All but one use only the Node
-> standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` /
+> standard library at runtime (`no-bash.mjs` too: its bash parser is bundled into it); the
+> auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` /
 > `markdownlint-cli2` — `npx` ships with Node and fetches those formatters on demand (they are NOT
 > bundled). A plugin **shell** hook can't run on native Windows
 > ([#18610](https://github.com/anthropics/claude-code/issues/18610)), which is why none remain.
@@ -20,7 +21,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included). Rationale + sources: [hooks/no-bash.md](hooks/no-bash.md). |
+| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Parses commands with unbash, bundled from `src/no-bash.js` by `pnpm build`; no runtime dependencies, cross-OS Node (Windows included). Rationale + sources: [hooks/no-bash.md](hooks/no-bash.md). |
 | `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. and injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
@@ -46,7 +47,13 @@ but the directives reference skills you won't have.
 
 ## Tests
 
+`shared/shell.js` is also snip-hook's parser: a change there changes both hooks, so run `pnpm test`
+and commit both rebuilt bundles.
+
 ```
+pnpm install                                            # once: rolldown + unbash for the build
+pnpm build                                              # regenerate no-bash.mjs after editing src/no-bash.js or shared/shell.js
+pnpm test                                               # CI: builds both bundles, then the shared parser + snip-hook tests
 node plugins/hooks/hooks/tests/run-no-bash-tests.mjs    # CI: no-bash.mjs functional contract
 node plugins/hooks/hooks/tests/redteam-no-bash.mjs      # CI: no-bash.mjs adversarial / edge-case battery
 node plugins/hooks/hooks/tests/mock-install-no-bash.mjs # CI: no-bash.mjs install-wiring proof

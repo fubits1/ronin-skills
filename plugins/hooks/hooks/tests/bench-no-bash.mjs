@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Performance benchmark for no-bash.mjs — pure Node, cross-OS. Times the hook per call on typical
-// commands, and on ADVERSARIAL LARGE inputs to prove the regexes + splitSegments + recursion stay
+// commands, and on ADVERSARIAL LARGE inputs to prove the parser + regexes + recursion stay
 // LINEAR (no ReDoS / catastrophic backtracking). The hooks.json timeout is 5000 ms; algorithm cost
 // on a 200KB+ crafted input must be a tiny fraction of that.
 //
