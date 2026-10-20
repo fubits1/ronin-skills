@@ -1,0 +1,8 @@
+#!/bin/sh
+# stand-in for `snip hook` in tests/index.test.js: SNIP_STUB=allow answers like snip's auto-allow,
+# SNIP_STUB=fail exits non-zero with garbage, anything else is snip's pass-through (no output)
+cat > /dev/null
+case "$SNIP_STUB" in
+  allow) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"snip auto-rewrite","updatedInput":{"command":"snip run -- x"}}}' ;;
+  fail) printf 'not json\n'; exit 1 ;;
+esac

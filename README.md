@@ -15,12 +15,13 @@ Claude Code plugin marketplace for framework-agnostic AI coding agent discipline
 
 ## Plugins
 
-Two plugins. The skills (`agent`) and the enforcement hooks (`hooks`) install separately, so enforcement is opt-in.
+Three plugins. The skills (`agent`), the enforcement hooks (`hooks`) and, for [snip](https://github.com/edouard-claude/snip) users, `snip-hook` install separately, so enforcement is opt-in.
 
 | Plugin | Contents | What it does |
 | --- | --- | --- |
 | [agent](plugins/agent/) | 17 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
 | [hooks](plugins/hooks/) | 5 hooks | Optional enforcement: no-bash (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, no-honest (stop the agent vouching with `honest` instead of showing evidence), plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
+| [snip-hook](plugins/snip-hook/) | 1 hook | For snip users: re-applies your Bash permission rules (deny, ask, allow) to the original command that snip's hook rewrites, and restores Claude Code's prompt where no rule covers it. No policy of its own. Standalone. |
 
 ## Installation
 
@@ -52,10 +53,16 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library at runtime (no-bash bundles its bash parser); the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
 
 ```
 /plugin install hooks
+```
+
+Optional, only if you use [snip](https://github.com/edouard-claude/snip): snip's hook rewrites Bash commands, which hides them from your permission rules. This plugin re-applies them (details: [plugins/snip-hook](plugins/snip-hook/)):
+
+```
+/plugin install snip-hook
 ```
 
 ## Updating
@@ -100,13 +107,23 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 5 enforcement ho
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [no-bash.md](plugins/hooks/hooks/no-bash.md). |
+| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Cross-OS Node with no runtime dependencies: its bash parser (unbash) is bundled in (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [no-bash.md](plugins/hooks/hooks/no-bash.md). |
 | `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. Zero-dependency cross-OS Node. |
 | `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. Zero-dependency cross-OS Node. |
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. Cross-OS Node; spawns `npx`. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 
 A `SessionStart` hook (`session-start.mjs`, Node) also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
+
+## Migration: no-bash parses commands with a bash parser
+
+`no-bash` now parses each command with [unbash](https://github.com/webpro-nl/unbash), bundled into `no-bash.mjs`, instead of hand-written splitting and regexes. Same block arms and the same set of `reason=` tags, though a few commands now get a different one; every existing test passes unchanged. What differs follows from parsing the way bash does:
+
+- **Passes now:** a banned tool that runs on another host or in a container (`ssh h 'echo $(cat f)'`, `docker exec c sh -c "grep …"`), since `Read` and `Grep` can't reach those files; tool names inside quoted text or heredoc data; the stdin of `bash setup.sh <<EOF`.
+- **Blocks now:** quoted command names bash resolves (`'grep' x`); a banned tool or mutating git behind a wrapper, a path or a wrapper flag's value (`timeout 60 git push`, `xargs -I % grep`, `git -C "/my repo" push`); a banned tool anywhere in a `bash -c` script or in a here-string fed to a shell; `a & b`.
+- **Same block, new tag:** `cat … &> file` and `{ cat a; } >> out` route to `Write`; a heredoc script fed to a shell reports `bashc-banned`; a banned tool inside a loop reports the tool.
+
+Rationale, every class of change, and the replay of 10,781 real commands: [no-bash.md](plugins/hooks/hooks/no-bash.md#limits).
 
 ## Migration: all enforcement hooks are now cross-OS Node
 

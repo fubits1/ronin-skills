@@ -1,0 +1,9 @@
+{
+  "name": "snip-hook",
+  "displayName": "Snip hook",
+  "version": "0.9.0",
+  "author": {
+    "name": "fubits1"
+  },
+  "description": "For snip users: re-applies your Bash permission rules (deny, ask, allow) to the original command that snip's hook rewrites, and restores Claude Code's prompt where no rule covers it. Has no policy of its own. Standalone; doesn't need agent or hooks."
+}

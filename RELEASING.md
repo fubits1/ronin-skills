@@ -1,6 +1,6 @@
 # Releasing
 
-The marketplace ships as **one version**. The single `agent` plugin bumps in sync with the marketplace top-level version. One tag per release. One GitHub Release per release.
+The marketplace ships as **one version**. Every plugin bumps in sync with the marketplace top-level version. One tag per release. One GitHub Release per release.
 
 ## Quick start
 
@@ -13,13 +13,14 @@ From a clean `main` that's up to date with `origin`:
 That's it. The script:
 
 1. Checks preconditions (on `main`, clean tree, in sync with origin, tag doesn't exist, version matches `X.Y.Z`).
-2. Bumps `marketplace.json` top-level `version`, the agent plugin's entry `version`, and each plugin's own `.claude-plugin/plugin.json` `version` to the given value (kept in sync so the two manifests never drift).
-3. Validates the marketplace and each plugin (`claude plugin validate .` and `for d in plugins/*/; do claude plugin validate "$d"; done`).
-4. Commits `chore(release): v$VERSION`.
-5. Tags `v$VERSION`.
-6. Pushes with `git push --follow-tags origin main`.
+2. Rebuilds the committed bundles and checks them (`pnpm install --frozen-lockfile`, `pnpm check:bundles`: every output in `rolldown.config.js` must be tracked and unchanged after the build), stopping on a failed build, or on a mismatch with the rebuilt bundles left in the tree to review and commit.
+3. Bumps `marketplace.json` top-level `version`, every plugin entry's `version`, and each plugin's own `.claude-plugin/plugin.json` `version` to the given value (kept in sync so the two manifests never drift).
+4. Validates the marketplace and each plugin (`claude plugin validate .` and `for d in plugins/*/; do claude plugin validate "$d"; done`).
+5. Commits `chore(release): v$VERSION`.
+6. Tags `v$VERSION`.
+7. Pushes with `git push --follow-tags origin main`.
 
-Dry run — bump, validate, then revert without committing/tagging/pushing:
+Dry run — check the bundles, bump, validate, then revert the bump without committing/tagging/pushing:
 
 ```bash
 ./scripts/release-dry.sh 0.1.0
@@ -43,15 +44,18 @@ git-cliff --latest            # what the next release will contain
 If `release.sh` can't run (e.g. Windows without bash):
 
 ```bash
-# 1. bump `version` in .claude-plugin/marketplace.json (top-level AND the agent plugin's entry) AND in each plugins/*/.claude-plugin/plugin.json
-# 2. validate marketplace + plugin
+# 1. rebuild and check the bundles
+pnpm install --frozen-lockfile
+pnpm check:bundles || exit 1
+# 2. bump `version` in .claude-plugin/marketplace.json (top-level AND every plugin entry) AND in each plugins/*/.claude-plugin/plugin.json
+# 3. validate marketplace + plugin
 claude plugin validate . || exit 1
 for d in plugins/*/; do
   claude plugin validate "$d" || exit 1
 done
-# 3. commit + tag + push
+# 4. commit + tag + push
 git commit -am "chore(release): v0.1.0"
-git tag v0.1.0
+git tag -a v0.1.0 -m v0.1.0   # annotated: --follow-tags pushes only annotated tags
 git push --follow-tags origin main
 ```
 
@@ -65,7 +69,7 @@ Semver, pre-1.0.
 
 ## Commit convention
 
-Conventional Commits. Scope is the plugin the change touches — `agent` (skills) or `hooks` (enforcement hooks):
+Conventional Commits. Scope is the plugin the change touches — `agent` (skills), `hooks` (enforcement hooks) or `snip` (snip-hook):
 
 ```
 feat(agent): new self-check skill

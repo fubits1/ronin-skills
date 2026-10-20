@@ -1,0 +1,8 @@
+{
+  "_comment": "Project-scope fixture: its deny/ask rules apply, its allow rules must never grant (Claude Code applies them only after the workspace trust dialog, which a hook cannot see).",
+  "permissions": {
+    "allow": ["Bash(rm *)"],
+    "deny": ["Bash(git push *)"],
+    "ask": ["Bash(curl *)"]
+  }
+}

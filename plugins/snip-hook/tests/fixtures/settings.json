@@ -1,0 +1,27 @@
+{
+  "_comment": "Fixture for snip-hook tests. Mirrors the shape of ~/.claude/settings.json, including gh api writes denied by explicit method only. Deliberately has NO `* `-prefixed twins, to prove the hook re-applies plain rules to the original command. Never the live settings — selected via SNIP_WRAPPER_SETTINGS.",
+  "permissions": {
+    "allow": [
+      "Bash(git log:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh api *)",
+      "Bash(bunx socket *)",
+      "Bash(bunx oxlint:*)",
+      "Bash(npx knip:*)",
+      "Bash(npx prettier *)",
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm build)",
+      "Bash(* --help *)",
+      "Read(//tmp/**)"
+    ],
+    "deny": [
+      "Bash(gh api -X DELETE *)",
+      "Bash(gh api -X POST *)",
+      "Bash(gh api -X PATCH *)",
+      "Bash(gh api -X PUT *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh pr close *)"
+    ],
+    "ask": ["Bash(ssh *)", "Bash(gh pr checkout *)"]
+  }
+}

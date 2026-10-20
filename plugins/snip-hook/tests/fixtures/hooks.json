@@ -1,0 +1,15 @@
+{
+  "_comment": "Settings shape with several PreToolUse handlers; src/rules.test.js finds the snip one.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node /x/no-bash.mjs" },
+          { "type": "command", "command": "/opt/homebrew/bin/snip hook" },
+          { "type": "command", "command": "node", "args": ["/x/index.js"] }
+        ]
+      }
+    ]
+  }
+}
