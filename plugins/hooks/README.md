@@ -25,6 +25,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 | `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [hooks/no-honest.md](hooks/no-honest.md). |
+| `no-idle-wait.mjs` | Stop | If the Stop input lists `background_tasks` with status `running`, returns `additionalContext`, which continues the turn once: take the next independent task instead of ending the turn idle (backs the `agent:discipline` background-work rule). Silent when nothing runs; loop-guarded by `stop_hook_active`. Zero-dependency Node. |
 
 A `SessionStart` hook also injects a directive to invoke the `agent:discipline` skill at the
 start of every session.
@@ -53,6 +54,6 @@ node plugins/hooks/hooks/tests/mock-install-no-bash.mjs # CI: no-bash.mjs instal
 node plugins/hooks/hooks/tests/validate-no-bash.mjs     # CI: shlex-oracle differential + seeded fuzz (needs python3)
 node plugins/hooks/hooks/tests/bench-no-bash.mjs        # CI: perf / no-ReDoS gate
 node plugins/hooks/hooks/tests/replay-transcript-no-bash.mjs <dir>  # ad-hoc: replay real session commands for false positives
-node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start
+node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start / no-idle-wait
 node plugins/hooks/hooks/tests/run-no-honest-tests.mjs  # CI: the no-honest Stop hook
 ```
