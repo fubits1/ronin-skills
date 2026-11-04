@@ -58,7 +58,7 @@ jobs:
         run: node plugins/hooks/hooks/tests/validate-no-bash.mjs
       - name: no-bash benchmark (perf / no-ReDoS gate)
         run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
-      - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start)
+      - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start / no-idle-wait)
         run: node plugins/hooks/hooks/tests/run-hook-tests.mjs
       - name: protocol-conformance + fail-open harness (all hooks, full stdin envelope)
         run: node plugins/hooks/hooks/tests/conformance-hooks.mjs

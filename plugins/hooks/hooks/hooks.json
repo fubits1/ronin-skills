@@ -58,6 +58,11 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/no-honest.mjs\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/no-idle-wait.mjs\"",
+            "timeout": 5
           }
         ]
       }

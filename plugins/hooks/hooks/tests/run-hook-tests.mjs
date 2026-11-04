@@ -2,6 +2,7 @@
 // Functional tests for the Node-ported workflow hooks: no-absolute-paths.mjs, force-plan-mode.mjs,
 // fix-formatting.mjs, session-start.mjs. Each hook exports a pure core function (tested in-process)
 // and is also spawned as a subprocess to check stdin parsing, exit codes, and stdout/stderr wiring.
+// no-idle-wait.mjs exports no core and is tested as a subprocess only.
 //
 //   node plugins/hooks/hooks/tests/run-hook-tests.mjs
 
@@ -331,6 +332,65 @@ const stringContentEntries = [
 ok(
   detectVouching(turnAssistantText(stringContentEntries)) === true,
   "turnText: string-content assistant message is scanned (honestly → true)",
+);
+
+console.log("=== no-idle-wait ===");
+function idleNudge(payload) {
+  const result = runHook("no-idle-wait.mjs", {
+    hook_event_name: "Stop",
+    stop_hook_active: false,
+    ...payload,
+  });
+  try {
+    const json = JSON.parse(result.stdout);
+    return json.hookSpecificOutput.hookEventName === "Stop"
+      ? json.hookSpecificOutput.additionalContext
+      : "";
+  } catch {
+    return result.code === 0 ? "" : `exit ${result.code}`;
+  }
+}
+const shellTask = {
+  type: "shell",
+  status: "running",
+  description: "tail logs",
+};
+const agentTask = {
+  type: "subagent",
+  status: "running",
+  description: "review diff",
+};
+const doneTask = {
+  type: "shell",
+  status: "completed",
+  description: "pnpm build",
+};
+ok(
+  idleNudge({ background_tasks: [shellTask] }).includes("shell: tail logs"),
+  "running task → Stop nudge names it",
+);
+const mixed = idleNudge({ background_tasks: [shellTask, doneTask, agentTask] });
+ok(
+  mixed.includes("shell: tail logs; subagent: review diff") &&
+    !mixed.includes("pnpm build"),
+  "only running tasks listed",
+);
+ok(
+  idleNudge({ background_tasks: [] }) === "",
+  "empty background_tasks → silent",
+);
+ok(idleNudge({}) === "", "background_tasks absent → silent");
+ok(
+  idleNudge({ background_tasks: [doneTask] }) === "",
+  "nothing running → silent",
+);
+ok(
+  idleNudge({ background_tasks: "running" }) === "",
+  "background_tasks not an array → silent",
+);
+ok(
+  idleNudge({ stop_hook_active: true, background_tasks: [shellTask] }) === "",
+  "loop guard: stop_hook_active → silent",
 );
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
