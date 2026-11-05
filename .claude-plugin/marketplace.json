@@ -41,6 +41,7 @@
         "no-bash",
         "no-honest",
         "no-idle-wait",
+        "no-tmp",
         "enforcement",
         "bash",
         "pretooluse"
