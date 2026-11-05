@@ -244,6 +244,7 @@ console.log(
     "session-start.mjs",
     "no-honest.mjs",
     "no-idle-wait.mjs",
+    "no-tmp.mjs",
   ];
   const badInputs = [
     "",

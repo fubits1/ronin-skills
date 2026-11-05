@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Functional tests for the Node-ported workflow hooks: no-absolute-paths.mjs, force-plan-mode.mjs,
-// fix-formatting.mjs, session-start.mjs. Each hook exports a pure core function (tested in-process)
-// and is also spawned as a subprocess to check stdin parsing, exit codes, and stdout/stderr wiring.
-// no-idle-wait.mjs exports no core and is tested as a subprocess only.
+// fix-formatting.mjs, session-start.mjs, no-tmp.mjs. Each hook exports a pure core function (tested
+// in-process) and is also spawned as a subprocess to check stdin parsing, exit codes, and
+// stdout/stderr wiring. no-idle-wait.mjs exports no core and is tested as a subprocess only.
 // no-honest.mjs's pure core (detectVouching / turnAssistantText) is tested in-process here; its
 // subprocess checks live in run-no-honest-tests.mjs.
 //
@@ -18,6 +18,7 @@ import { planDirective } from "../force-plan-mode.mjs";
 import { formatterFor, formatterSpec } from "../fix-formatting.mjs";
 import { sessionStartPayload } from "../session-start.mjs";
 import { detectVouching, turnAssistantText } from "../no-honest.mjs";
+import { checkTempDir } from "../no-tmp.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOKS = join(HERE, "..");
@@ -387,6 +388,113 @@ ok(
   idleNudge({ stop_hook_active: true, background_tasks: [shellTask] }) === "",
   "loop guard: stop_hook_active → silent",
 );
+
+console.log("=== no-tmp ===");
+// getTempDirs() in no-tmp.mjs passes the tmpdir() path and its realpath.
+const MAC_TEMP_DIRS = ["/var/folders/xy/T", "/private/var/folders/xy/T"];
+const WINDOWS_TEMP_DIRS = ["C:\\Users\\me\\AppData\\Local\\Temp"];
+const checkBash = (command) =>
+  checkTempDir("Bash", { command }, MAC_TEMP_DIRS, "darwin");
+for (const command of [
+  "echo hi > /tmp/x",
+  "timeout 300 lint.sh >/tmp/dev-null-placeholder 2>&1",
+  "cd /private/tmp",
+  "ls /var/tmp",
+  "ls /private/var/tmp",
+  "cp a $TMPDIR/b",
+  "cp a ${TMPDIR}/b",
+  "cp a $TEMP/b",
+  "cp a ${TMP}/b",
+  "cat /var/folders/xy/T/f",
+  "cat /private/var/folders/xy/T/f",
+]) {
+  ok(checkBash(command) !== null, `bash block: ${command}`);
+}
+for (const command of [
+  "pnpm test",
+  "ls build/tmp/x",
+  "ls ./tmp",
+  "ls ~/tmp",
+  "touch /tmp_err_c.txt",
+  "echo $TEMPLATE",
+  "echo $TMP_OUT",
+]) {
+  ok(checkBash(command) === null, `bash allow: ${command}`);
+}
+// Linux with TMPDIR unset: tmpdir() is /tmp, so the configured temp dir must match as a path segment too.
+const checkLinuxBash = (command) =>
+  checkTempDir("Bash", { command }, ["/tmp"], "linux");
+ok(
+  checkLinuxBash("cat /tmp/x") !== null,
+  "bash block (temp dir /tmp): cat /tmp/x",
+);
+for (const command of ["ls build/tmp/output", "touch /tmp_err_c.txt"]) {
+  ok(
+    checkLinuxBash(command) === null,
+    `bash allow (temp dir /tmp): ${command}`,
+  );
+}
+// Fail open: an empty path is malformed input, even when the cwd is a temp dir.
+for (const toolInput of [
+  { file_path: "" },
+  { notebook_path: "" },
+  { file_path: "", notebook_path: "" },
+]) {
+  ok(
+    checkTempDir(
+      "NotebookEdit",
+      toolInput,
+      [process.cwd()],
+      process.platform,
+    ) === null,
+    `empty path allow: ${JSON.stringify(toolInput)}`,
+  );
+}
+const checkFile = (toolName, toolInput, platform = "darwin") =>
+  checkTempDir(
+    toolName,
+    toolInput,
+    platform === "win32" ? WINDOWS_TEMP_DIRS : MAC_TEMP_DIRS,
+    platform,
+  );
+for (const [toolName, toolInput, platform] of [
+  ["Write", { file_path: "/tmp/x.txt" }],
+  ["Edit", { file_path: "/private/tmp/claude-501/p/s/scratchpad/a.md" }],
+  ["Write", { file_path: "/var/folders/xy/T/f" }],
+  ["Write", { file_path: "C:\\Users\\me\\AppData\\Local\\Temp\\x" }, "win32"],
+  ["Write", { file_path: "/tmp/x" }, "win32"],
+  ["NotebookEdit", { notebook_path: "/tmp/a.ipynb" }],
+]) {
+  ok(
+    checkFile(toolName, toolInput, platform) !== null,
+    `${toolName} block: ${JSON.stringify(toolInput)} (${platform || "darwin"})`,
+  );
+}
+for (const [toolName, toolInput] of [
+  ["Write", { file_path: "/Users/me/proj/tmp/a" }],
+  ["Write", { file_path: "src/tmp/x" }],
+  ["Read", { file_path: "/tmp/x" }],
+]) {
+  ok(
+    checkFile(toolName, toolInput) === null,
+    `${toolName} allow: ${JSON.stringify(toolInput)}`,
+  );
+}
+const blockedBash = runHook("no-tmp.mjs", {
+  tool_name: "Bash",
+  tool_input: { command: "echo hi > /tmp/x" },
+});
+ok(
+  blockedBash.code === 2 &&
+    blockedBash.stderr.includes("BLOCKED") &&
+    blockedBash.stdout === "",
+  "subprocess: /tmp in Bash → exit 2, message on stderr",
+);
+const allowedWrite = runHook("no-tmp.mjs", {
+  tool_name: "Write",
+  tool_input: { file_path: "src/a.ts" },
+});
+ok(allowedWrite.code === 0, "subprocess: project path → exit 0");
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);
