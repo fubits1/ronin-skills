@@ -395,7 +395,8 @@ ok(
 );
 
 console.log("=== no-tmp ===");
-const MAC_TEMP_DIRS = ["/var/folders/xy/T"];
+// getTempDirs() in no-tmp.mjs passes the tmpdir() path and its realpath.
+const MAC_TEMP_DIRS = ["/var/folders/xy/T", "/private/var/folders/xy/T"];
 const WINDOWS_TEMP_DIRS = ["C:\\Users\\me\\AppData\\Local\\Temp"];
 const checkBash = (command) =>
   checkTempDir("Bash", { command }, MAC_TEMP_DIRS, "darwin");
@@ -407,7 +408,10 @@ for (const command of [
   "ls /private/var/tmp",
   "cp a $TMPDIR/b",
   "cp a ${TMPDIR}/b",
+  "cp a $TEMP/b",
+  "cp a ${TMP}/b",
   "cat /var/folders/xy/T/f",
+  "cat /private/var/folders/xy/T/f",
 ]) {
   ok(checkBash(command) !== null, `bash block: ${command}`);
 }
@@ -417,8 +421,39 @@ for (const command of [
   "ls ./tmp",
   "ls ~/tmp",
   "touch /tmp_err_c.txt",
+  "echo $TEMPLATE",
+  "echo $TMP_OUT",
 ]) {
   ok(checkBash(command) === null, `bash allow: ${command}`);
+}
+// Linux with TMPDIR unset: tmpdir() is /tmp, so the configured temp dir must match as a path segment too.
+const checkLinuxBash = (command) =>
+  checkTempDir("Bash", { command }, ["/tmp"], "linux");
+ok(
+  checkLinuxBash("cat /tmp/x") !== null,
+  "bash block (temp dir /tmp): cat /tmp/x",
+);
+for (const command of ["ls build/tmp/output", "touch /tmp_err_c.txt"]) {
+  ok(
+    checkLinuxBash(command) === null,
+    `bash allow (temp dir /tmp): ${command}`,
+  );
+}
+// Fail open: an empty path is malformed input, even when the cwd is a temp dir.
+for (const toolInput of [
+  { file_path: "" },
+  { notebook_path: "" },
+  { file_path: "", notebook_path: "" },
+]) {
+  ok(
+    checkTempDir(
+      "NotebookEdit",
+      toolInput,
+      [process.cwd()],
+      process.platform,
+    ) === null,
+    `empty path allow: ${JSON.stringify(toolInput)}`,
+  );
 }
 const checkFile = (toolName, toolInput, platform = "darwin") =>
   checkTempDir(

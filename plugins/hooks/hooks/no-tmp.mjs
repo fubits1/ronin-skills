@@ -18,7 +18,9 @@ import { posix, win32 } from "node:path";
 
 // a temp root as its own path segment, so a project's `build/tmp/` or `./tmp/` does not match
 const TEMP_PATH_RE = /(?<![\w.~/-])(?:\/private)?(?:\/var)?\/tmp(?![\w.-])/;
-const TEMP_ENV_TOKENS = ["$TMPDIR", "${TMPDIR}", "%TEMP%", "%TMP%"];
+// whole variable names only, so `$TEMPLATE` or `$TMP_OUT` does not match
+const TEMP_VAR_RE = /\$\{?(?:TMPDIR|TEMP|TMP)\b\}?/;
+const TEMP_ENV_TOKENS = ["%TEMP%", "%TMP%"];
 const FILE_TOOLS = ["Write", "Edit", "NotebookEdit"];
 
 function buildBlockMessage(match) {
@@ -30,12 +32,18 @@ function toComparable(path, platform) {
   return platform === "win32" ? path.replaceAll("\\", "/").toLowerCase() : path;
 }
 
+function hasPathSegment(text, path) {
+  const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\w.~/-])${escapedPath}(?![\\w.-])`).test(text);
+}
+
 function findInCommand(command, tempDirs, platform) {
   const comparableCommand = toComparable(command, platform);
   return (
     command.match(TEMP_PATH_RE)?.[0] ||
+    command.match(TEMP_VAR_RE)?.[0] ||
     TEMP_ENV_TOKENS.find((token) => command.includes(token)) ||
-    tempDirs.find((tempDir) => comparableCommand.includes(tempDir))
+    tempDirs.find((tempDir) => hasPathSegment(comparableCommand, tempDir))
   );
 }
 
@@ -65,7 +73,11 @@ export function checkTempDir(
   let match;
   if (toolName === "Bash" && typeof command === "string") {
     match = findInCommand(command, comparableTempDirs, platform);
-  } else if (FILE_TOOLS.includes(toolName) && typeof path === "string") {
+  } else if (
+    FILE_TOOLS.includes(toolName) &&
+    typeof path === "string" &&
+    path
+  ) {
     match = findInPath(path, comparableTempDirs, platform);
   }
   return match ? buildBlockMessage(match) : null;
