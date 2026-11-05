@@ -40,8 +40,8 @@ but the directives reference skills you won't have.
 ## Installation
 
 ```
-/plugin install agent
-/plugin install hooks
+/plugin install agent --marketplace fubits1/ronin-skills
+/plugin install hooks --marketplace fubits1/ronin-skills
 /reload-plugins
 ```
 

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://cdn.claude.ai/plugins/marketplace.schema.json",
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "ronin-skills",
   "description": "Claude Code plugin marketplace for framework-agnostic AI coding agent discipline: research, planning, self-checks, completion verification, git/CI/dev-server/pnpm/socket/no-bash/obey discipline (agent plugin), plus optional Bash-tool and workflow enforcement hooks (hooks plugin).",
   "owner": {

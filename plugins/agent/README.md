@@ -40,4 +40,8 @@ The `superpowers` plugin must be installed. `plan` references `superpowers:syste
 
 ## Installation
 
-See the [ronin-skills marketplace README](https://github.com/fubits1/ronin-skills) for installation and setup instructions.
+```
+/plugin install agent --marketplace fubits1/ronin-skills
+```
+
+On Claude Code v2.1.275 or later this adds the marketplace if needed. For the full setup, see the [ronin-skills marketplace README](https://github.com/fubits1/ronin-skills).
