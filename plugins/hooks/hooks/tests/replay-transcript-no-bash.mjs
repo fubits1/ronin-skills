@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AD-HOC validation gate (not CI — ships no data, takes a path). Replays the REAL Bash commands a
+// AD-HOC validation report (not CI — ships no data, takes a path). Replays the REAL Bash commands a
 // coding agent actually issued (mined from Claude Code session transcripts) through the hook and
 // reports what BLOCKS, grouped by reason. This is the only false-positive oracle whose ground truth
 // is NOT the author's enumeration: a legit everyday command that BLOCKS here is a real false positive.
@@ -10,36 +10,35 @@
 // to scan other corpora. Distinct commands are deduped; blocks are listed per reason for triage.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { scan } from "../no-bash.mjs";
 
 const args = process.argv.slice(2);
-const targets = args.length
-  ? args
-  : [
-      "../../../../.claude/projects/-Users-fubits-Developer-FOSS-skills-ronin-skills",
-    ];
+const PROJECT_SLUG = "-Users-fubits-Developer-FOSS-skills-ronin-skills";
+const TRANSCRIPT_DIR = join(homedir(), ".claude", "projects", PROJECT_SLUG);
+const targets = args.length ? args : [TRANSCRIPT_DIR];
 
-function jsonlFiles(p) {
-  let st;
+function listJsonlFiles(targetPath) {
+  let stats;
   try {
-    st = statSync(p);
+    stats = statSync(targetPath);
   } catch {
     return [];
   }
-  if (st.isDirectory()) {
-    return readdirSync(p)
-      .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => join(p, f));
+  if (stats.isDirectory()) {
+    return readdirSync(targetPath)
+      .filter((file) => file.endsWith(".jsonl"))
+      .map((file) => join(targetPath, file));
   }
-  return p.endsWith(".jsonl") ? [p] : [];
+  return targetPath.endsWith(".jsonl") ? [targetPath] : [];
 }
 
 // recursively collect every Bash tool_use command in a parsed transcript record
 function collectBash(node, output) {
   if (!node || typeof node !== "object") return;
   if (Array.isArray(node)) {
-    for (const x of node) collectBash(x, output);
+    for (const child of node) collectBash(child, output);
     return;
   }
   if (
@@ -50,10 +49,10 @@ function collectBash(node, output) {
   ) {
     output.add(node.input.command);
   }
-  for (const k of Object.keys(node)) collectBash(node[k], output);
+  for (const key of Object.keys(node)) collectBash(node[key], output);
 }
 
-const files = targets.flatMap(jsonlFiles);
+const files = targets.flatMap(listJsonlFiles);
 if (!files.length) {
   console.log("No .jsonl transcripts found at: " + targets.join(", "));
   process.exit(0);
@@ -61,10 +60,10 @@ if (!files.length) {
 
 const commands = new Set();
 let lines = 0;
-for (const f of files) {
+for (const file of files) {
   let text;
   try {
-    text = readFileSync(f, "utf8");
+    text = readFileSync(file, "utf8");
   } catch {
     continue;
   }
@@ -85,8 +84,8 @@ for (const command of commands) {
   let result;
   try {
     result = scan(command);
-  } catch (e) {
-    result = { tag: "THREW:" + e.message };
+  } catch (error) {
+    result = { tag: "THREW:" + error.message };
   }
   if (!result) {
     allowed++;
@@ -96,7 +95,7 @@ for (const command of commands) {
   byReason.get(result.tag).push(command);
 }
 
-const oneline = (input) => input.replace(/\n/g, "\\n");
+const toOneLine = (input) => input.replace(/\n/g, "\\n");
 console.log(
   `Replayed ${commands.size} distinct Bash commands from ${files.length} transcript(s) (${lines} lines).`,
 );
@@ -105,7 +104,7 @@ const order = [...byReason.entries()].sort((a, b) => b[1].length - a[1].length);
 for (const [reason, list] of order) {
   console.log(`reason=${reason}  (${list.length})`);
   for (const command of list.slice(0, 12)) {
-    console.log(`    ${oneline(command).slice(0, 160)}`);
+    console.log(`    ${toOneLine(command).slice(0, 160)}`);
   }
   if (list.length > 12) console.log(`    … and ${list.length - 12} more`);
   console.log("");

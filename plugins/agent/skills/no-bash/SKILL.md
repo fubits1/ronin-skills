@@ -24,7 +24,7 @@ The `hooks` plugin (`hooks@ronin-skills`, optional install) ships the hook (`plu
 
 ### For file search / read
 
-1. **[fff](https://fff.dmtrkovalenko.dev/) MCP** — first choice for any file search or content grep inside a git-indexed directory. Frecency-ranked results (frequent/recent files first, dirty files boosted), git-aware, constraint-aware. See README.md → "fff instead of grep/bash etc.".
+1. **[fff](https://fff.dmtrkovalenko.dev/) MCP** — first choice for any file search or content grep inside a git-indexed directory. Frecency-ranked results (frequent/recent files first, dirty files boosted), git-aware, constraint-aware. See the root README's "Biased towards" list.
 2. **Built-in `Grep` / `Read` / `Glob`** — fallback when fff isn't installed or the search target lies outside the git tree. `Read` is present on every build. The `Grep` and `Glob` tools were removed on native macOS/Linux builds in Claude Code 2.1.117 (replaced by Bash `ugrep`/`bfs`, which return raw dumps this hook routes away from); on those builds fff is the structured search path. Windows and npm-installed builds keep `Grep`/`Glob`.
 3. **Bash** — only for the legitimate uses listed at the bottom of this skill. Search exception: a native build with fff down has no structured search left. Ask the user to set `NO_BASH_SEARCH_FALLBACK=1` (settings.json `env`); once set, plain `grep`/`find` pass.
 

@@ -22,7 +22,7 @@ die() { printf 'release.sh: %s\n' "$*" >&2; exit 1; }
 
 cd "$(git rev-parse --show-toplevel)"
 
-[[ -f .claude-plugin/marketplace.json ]]   || die "marketplace.json not found; run from repo root"
+[[ -f .claude-plugin/marketplace.json ]]   || die ".claude-plugin/marketplace.json not found at repo root"
 [[ -f .github/workflows/release.yml ]]     || die ".github/workflows/release.yml missing"
 command -v jq >/dev/null                   || die "jq is required"
 command -v claude >/dev/null               || die "claude CLI is required"
@@ -42,32 +42,33 @@ REMOTE="$(git rev-parse origin/main)"
 
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
 
+MANIFESTS=(.claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json)
 echo "release.sh: bumping marketplace.json + plugin manifests to $VERSION"
-tmp="$(mktemp .claude-plugin/marketplace.json.XXXXXX)"
-trap 'git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json 2>/dev/null; rm -f "$tmp"' ERR INT TERM EXIT
+bumped_marketplace="$(mktemp .claude-plugin/marketplace.json.XXXXXX)"
+trap 'git checkout -- "${MANIFESTS[@]}" 2>/dev/null; rm -f "$bumped_marketplace" "${bumped_manifest:-}"' ERR INT TERM EXIT
 jq --arg v "$VERSION" \
   '.version = $v | .plugins |= map(.version = $v)' \
-  .claude-plugin/marketplace.json > "$tmp"
-mv "$tmp" .claude-plugin/marketplace.json
+  .claude-plugin/marketplace.json > "$bumped_marketplace"
+mv "$bumped_marketplace" .claude-plugin/marketplace.json
 
 # keep each plugin's own manifest version in sync with the marketplace, so
 # `claude plugin validate` sees a version and the two never drift apart
-for pj in plugins/*/.claude-plugin/plugin.json; do
-  [[ -f "$pj" ]] || continue
-  pjtmp="$(mktemp "$pj.XXXXXX")"
-  jq --arg v "$VERSION" '.version = $v' "$pj" > "$pjtmp"
-  mv "$pjtmp" "$pj"
+for plugin_manifest in plugins/*/.claude-plugin/plugin.json; do
+  [[ -f "$plugin_manifest" ]] || continue
+  bumped_manifest="$(mktemp "$plugin_manifest.XXXXXX")"
+  jq --arg v "$VERSION" '.version = $v' "$plugin_manifest" > "$bumped_manifest"
+  mv "$bumped_manifest" "$plugin_manifest"
 done
 
 echo "release.sh: validating marketplace + plugins"
 claude plugin validate . || die "marketplace validation failed"
-for d in plugins/*/; do
-  claude plugin validate "$d" || die "validation failed for $d"
+for plugin_dir in plugins/*/; do
+  claude plugin validate "$plugin_dir" || die "validation failed for $plugin_dir"
 done
 
 if [[ "$DRY_RUN" == "1" ]]; then
   echo "release.sh: --dry-run, reverting bump"
-  git checkout -- .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json
+  git checkout -- "${MANIFESTS[@]}"
   echo
   if command -v git-cliff >/dev/null; then
     echo "release.sh: release notes preview for $TAG"
@@ -82,8 +83,8 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 echo "release.sh: committing + tagging"
-git add .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json
-# --allow-empty: handles the case where marketplace.json is already at the
+git add "${MANIFESTS[@]}"
+# --allow-empty: handles the case where marketplace.json and every plugin.json are already at the
 # target version (e.g. initial release scaffolded at the same version). jq's
 # rewrite produces no diff, so the chore commit would be empty — which is fine
 # for tagging an already-correct state. Real bumps still produce a normal
@@ -95,4 +96,4 @@ echo "release.sh: pushing"
 git push --follow-tags origin main
 
 echo "release.sh: $TAG pushed. Watch release.yml at:"
-echo "  https://github.com/$(git config --get remote.origin.url | sed -E 's#.*[:/]([^/]+/[^/]+)\.git#\1#')/actions"
+echo "  https://github.com/$(git config --get remote.origin.url | sed -E 's#\.git$##; s#.*[:/]([^/]+/[^/]+)$#\1#')/actions"

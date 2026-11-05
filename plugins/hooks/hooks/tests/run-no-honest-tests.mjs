@@ -27,7 +27,7 @@ let fail = 0;
 
 // Spawn the hook with a Stop payload on stdin; return its stdout.
 function runHook(payload) {
-  const r = spawnSync(process.execPath, [HOOK], {
+  const run = spawnSync(process.execPath, [HOOK], {
     input: JSON.stringify(payload),
     encoding: "utf8",
     timeout: 10000,
@@ -35,15 +35,15 @@ function runHook(payload) {
   // The hook's contract is fail-open exit 0. A spawn error or non-zero/timeout exit means the hook
   // itself is broken — throw loudly instead of letting empty stdout read as a silent ALLOW (a false
   // pass on the ALLOW-expecting cases). (no-honest never exits 2; only 0 is valid here.)
-  if (r.error) throw r.error;
-  if (r.status !== 0) {
-    throw new Error(`no-honest hook exited ${r.status}\n${r.stderr || ""}`);
+  if (run.error) throw run.error;
+  if (run.status !== 0) {
+    throw new Error(`no-honest hook exited ${run.status}\n${run.stderr || ""}`);
   }
-  return r.stdout || "";
+  return run.stdout || "";
 }
 
 // Did the hook emit a non-blocking nudge (additionalContext)?
-function nudged(stdout) {
+function hasNudge(stdout) {
   try {
     const json = JSON.parse(stdout.trim());
     return (json?.hookSpecificOutput?.additionalContext || "") !== "";
@@ -59,35 +59,35 @@ const assistantEntry = (text) =>
   });
 
 // runCase(BLOCK|ALLOW, stop_hook_active, label, assistant-message-text): single assistant message.
-function runCase(expect, active, label, msg) {
-  const tx = join(WORK, "t.jsonl");
-  writeFileSync(tx, assistantEntry(msg));
-  const got = nudged(
+function runCase(expected, active, label, message) {
+  const transcriptPath = join(WORK, "t.jsonl");
+  writeFileSync(transcriptPath, assistantEntry(message));
+  const got = hasNudge(
     runHook({
       stop_hook_active: active,
-      transcript_path: tx,
+      transcript_path: transcriptPath,
       hook_event_name: "Stop",
     }),
   )
     ? "BLOCK"
     : "ALLOW";
-  if (got === expect) {
+  if (got === expected) {
     pass++;
   } else {
-    console.log(`FAIL  [${label} expected=${expect} got=${got}]  ${msg}`);
+    console.log(`FAIL  [${label} expected=${expected} got=${got}]  ${message}`);
     fail++;
   }
 }
 
 // runTurn(BLOCK|ALLOW, label, ...assistant-msgs): a user prompt, then each assistant message
 // interleaved with a tool_result, proving the scan covers the WHOLE turn (not just the last message).
-function runTurn(expect, label, ...msgs) {
-  const tx = join(WORK, "turn.jsonl");
+function runTurn(expected, label, ...messages) {
+  const transcriptPath = join(WORK, "turn.jsonl");
   const lines = [
     JSON.stringify({ type: "user", message: { role: "user", content: "go" } }),
   ];
-  for (const m of msgs) {
-    lines.push(assistantEntry(m));
+  for (const message of messages) {
+    lines.push(assistantEntry(message));
     lines.push(
       JSON.stringify({
         type: "user",
@@ -98,15 +98,14 @@ function runTurn(expect, label, ...msgs) {
       }),
     );
   }
-  writeFileSync(tx, lines.join("\n"));
-  const got = nudged(runHook({ stop_hook_active: false, transcript_path: tx }))
-    ? "BLOCK"
-    : "ALLOW";
-  if (got === expect) {
+  writeFileSync(transcriptPath, lines.join("\n"));
+  const payload = { stop_hook_active: false, transcript_path: transcriptPath };
+  const got = hasNudge(runHook(payload)) ? "BLOCK" : "ALLOW";
+  if (got === expected) {
     pass++;
   } else {
     console.log(
-      `FAIL  [${label} expected=${expect} got=${got}]  turn(${msgs.length} msgs)`,
+      `FAIL  [${label} expected=${expected} got=${got}]  turn(${messages.length} msgs)`,
     );
     fail++;
   }

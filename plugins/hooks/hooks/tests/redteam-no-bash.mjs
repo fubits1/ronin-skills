@@ -17,13 +17,13 @@ delete process.env.NO_BASH_SEARCH_FALLBACK;
 
 let pass = 0;
 let fail = 0;
-const oneline = (text) => text.replace(/\n/g, "~").replace(/\t/g, ">");
+const toOneLine = (text) => text.replace(/\n/g, "~").replace(/\t/g, ">");
 
 function expect(want, reason, label, command) {
-  const payload = JSON.stringify({ tool_input: { command: command } });
   const result = spawnSync(process.execPath, [HOOK], {
-    input: payload,
+    input: JSON.stringify({ tool_input: { command: command } }),
     encoding: "utf8",
+    timeout: 10000, // a hook that hangs is a failure, not a pass
   });
   if (result.error) {
     fail++;
@@ -33,22 +33,22 @@ function expect(want, reason, label, command) {
   const status = result.status; // null if killed by a signal
   const got =
     status === 2 ? "BLOCK" : status === 0 ? "ALLOW" : `EXIT(${status})`;
-  const m = (result.stderr || "").split("\n")[0].match(/reason=([a-z-]+)/);
-  const gotReason = m ? m[1] : "-";
+  const match = (result.stderr || "").split("\n")[0].match(/reason=([a-z-]+)/);
+  const gotReason = match ? match[1] : "-";
   if (got === want && gotReason === reason) {
-    console.log(`PASS  [${label} ${want} ${gotReason}]  ${oneline(command)}`);
+    console.log(`PASS  [${label} ${want} ${gotReason}]  ${toOneLine(command)}`);
     pass++;
   } else {
     console.log(
-      `FAIL  [${label} want=${want}/${reason} got=${got}/${gotReason}]  ${oneline(command)}`,
+      `FAIL  [${label} want=${want}/${reason} got=${got}/${gotReason}]  ${toOneLine(command)}`,
     );
     fail++;
   }
 }
 
 console.log("=== Banned tools must BLOCK ===");
-for (const t of ["grep", "egrep", "fgrep", "rg"]) {
-  expect("BLOCK", `bash-${t}`, `banned:${t}`, `${t} x f`);
+for (const tool of ["grep", "egrep", "fgrep", "rg"]) {
+  expect("BLOCK", `bash-${tool}`, `banned:${tool}`, `${tool} x f`);
 }
 expect("BLOCK", "bash-awk", "banned:awk", "awk x f");
 expect("BLOCK", "cat-read", "banned:cat", "cat f");

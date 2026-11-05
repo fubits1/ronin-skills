@@ -7,15 +7,15 @@
 //
 // Why additionalContext and NOT {"decision":"block"} (researched against the hooks docs + GitHub):
 //   - decision:block on Stop during an Opus 4.6/4.7/4.8 extended-thinking session corrupts the
-//     finished message's thinking blocks on re-entry -> hard API 400 (anthropics/claude-code#63287,
-//     open). additionalContext-only never re-enters or modifies the message, so it sidesteps that.
-//   - Blocking Stop is won't-fix / ignored anyway (#3656, closed not_planned), and assistant-output
+//     finished message's thinking blocks on re-entry -> hard API 400 (anthropics/claude-code#63287).
+//     additionalContext continues the turn too (hooks docs), labelled hook feedback, not an error.
+//   - Blocking Stop was ignored on some builds (#3656, closed not_planned), and assistant-output
 //     content cannot be hard-enforced by design (#61152, closed). Output hooks are advisory.
 //   - The model can split the word ("hon est") to evade the match (#29691). Best-effort.
 //   - Plugin Stop hooks are themselves unreliable (#66557 $CLAUDE_PLUGIN_ROOT not injected,
 //     #64064 node-not-found in the hook env), so treat this as opportunistic and rely on the
 //     agent:discipline rule as the real backstop.
-//   - Loop guard: if stop_hook_active is true the hook already ran this turn, so it exits 0.
+//   - Loop guard: if stop_hook_active is true a Stop hook already continued this turn, so it exits 0.
 //
 // Plain Node ESM (.mjs): TS was benchmarked (Node 24 strips types natively) but added ~20 ms/Stop
 // for the type-strip with no gain, so JS is used for the lower, flat latency. Zero dependencies —
@@ -48,33 +48,33 @@ function readStdin() {
 }
 
 // Read only the last `maxBytes` of a file (seek from end) — never slurps the whole transcript.
-function tailBytes(path, maxBytes) {
+function readTailBytes(path, maxBytes) {
   const fd = openSync(path, "r");
   try {
     const size = fstatSync(fd).size;
     const start = size > maxBytes ? size - maxBytes : 0;
-    const len = size - start;
-    if (len <= 0) return { text: "", truncated: false };
-    const buf = Buffer.allocUnsafe(len);
-    readSync(fd, buf, 0, len, start);
-    return { text: buf.toString("utf8"), truncated: start > 0 };
+    const length = size - start;
+    if (length <= 0) return { text: "", truncated: false };
+    const buffer = Buffer.allocUnsafe(length);
+    readSync(fd, buffer, 0, length, start);
+    return { text: buffer.toString("utf8"), truncated: start > 0 };
   } finally {
     closeSync(fd);
   }
 }
 
-const isUser = (e) => e?.type === "user" || e?.message?.role === "user";
-const isAssistant = (e) =>
-  e?.type === "assistant" || e?.message?.role === "assistant";
+const isUser = (row) => row?.type === "user" || row?.message?.role === "user";
+const isAssistant = (row) =>
+  row?.type === "assistant" || row?.message?.role === "assistant";
+const isTextBlock = (block) => block?.type === "text";
 
 // A genuine user prompt (turn boundary) vs a tool-result entry (also role:user). Prompts carry
 // text; tool results carry tool_result blocks only.
-function isUserPrompt(e) {
-  if (!isUser(e)) return false;
-  const c = e?.message?.content;
-  if (typeof c === "string") return c.length > 0;
-  if (Array.isArray(c)) return c.some((b) => b?.type === "text");
-  return false;
+function isUserPrompt(entry) {
+  if (!isUser(entry)) return false;
+  const content = entry.message?.content;
+  if (typeof content === "string") return content.length > 0;
+  return Array.isArray(content) && content.some(isTextBlock);
 }
 
 // The assistant text in the CURRENT turn = every assistant text block after the last genuine user
@@ -88,10 +88,10 @@ export function turnAssistantText(entries) {
   for (let i = lastPrompt + 1; i < entries.length; i++) {
     const entry = entries[i];
     if (!isAssistant(entry)) continue;
-    const content = entry?.message?.content;
+    const content = entry.message?.content;
     if (Array.isArray(content)) {
       for (const block of content) {
-        if (block?.type === "text" && block.text) text += block.text + "\n";
+        if (isTextBlock(block) && block.text) text += block.text + "\n";
       }
     } else if (typeof content === "string" && content) {
       text += content + "\n"; // some turns store assistant content as a plain string, not blocks
@@ -116,30 +116,30 @@ function main() {
   try {
     input = JSON.parse(readStdin() || "{}");
   } catch {
-    process.exit(0);
+    return;
   }
 
-  if (input.stop_hook_active === true) process.exit(0); // loop guard
+  if (input.stop_hook_active === true) return; // loop guard
   const path = input.transcript_path;
-  if (!path) process.exit(0);
+  if (!path) return;
 
   let chunk, truncated;
   try {
-    ({ text: chunk, truncated } = tailBytes(path, TAIL_BYTES));
+    ({ text: chunk, truncated } = readTailBytes(path, TAIL_BYTES));
   } catch {
-    process.exit(0); // unreadable transcript: fail open
+    return; // unreadable transcript: fail open
   }
-  if (!chunk) process.exit(0);
+  if (!chunk) return;
 
   const lines = chunk.split("\n");
   if (truncated) lines.shift(); // first line is partial when the window truncated the file
 
   const entries = [];
-  for (const ln of lines) {
-    const s = ln.trim();
-    if (!s) continue;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
     try {
-      entries.push(JSON.parse(s));
+      entries.push(JSON.parse(trimmed));
     } catch {
       // skip a malformed/partial line rather than failing the whole hook
     }
@@ -147,7 +147,7 @@ function main() {
 
   if (detectVouching(turnAssistantText(entries))) {
     // additionalContext only — NOT decision:block (that crashes Opus 4.x thinking sessions; see
-    // header). Non-blocking: the turn already ended; the model reads this on the next turn.
+    // header).
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -158,11 +158,10 @@ function main() {
       }),
     );
   }
-  process.exit(0);
 }
 
 // Run only when executed directly (`node no-honest.mjs`); when imported (tests) export the core
-// without reading stdin / exiting. realpath both sides so a symlinked install path still matches; on
+// without reading stdin / exiting. Realpath both sides so a symlinked install path still matches; on
 // any uncertainty default to running (a Stop hook that no-ops is harmless, but consistency matters).
 let runAsHook = true;
 try {
@@ -170,7 +169,7 @@ try {
     realpathSync(process.argv[1]) ===
     realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  runAsHook = true;
+  // realpath failed: keep the default and run
 }
 if (runAsHook) {
   try {

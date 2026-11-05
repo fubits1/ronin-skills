@@ -44,7 +44,7 @@ node plugins/hooks/hooks/tests/conformance-hooks.mjs   # fail-open + protocol co
 node plugins/hooks/hooks/tests/run-no-honest-tests.mjs
 
 node --check plugins/hooks/hooks/<edited>.mjs           # syntax
-pnpx oxlint .                                            # code-style (curly, naming)
+pnpx oxlint .                                            # code-style (curly)
 claude plugin validate .                                # + each plugins/*/
 ```
 

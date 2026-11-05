@@ -52,7 +52,7 @@ The skills:
 /plugin install agent
 ```
 
-Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
+Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-format, Stop-event nudges, discipline directive). **These are global**: once installed they fire in every project on the machine. **All run on Node and work cross-OS** (native Windows included — a plugin shell hook can't, [#18610](https://github.com/anthropics/claude-code/issues/18610)). Every hook except the auto-formatter needs only the Node standard library; the auto-formatter (`fix-formatting.mjs`) shells out to `npx prettier` / `markdownlint-cli2` (npx ships with Node, which fetches them on demand). Install only if you want enforcement:
 
 ```
 /plugin install hooks
@@ -96,11 +96,11 @@ This loads the skills **in addition** to anything in `~/.claude/skills/`. On a d
 
 ## Hooks
 
-The optional **`hooks`** plugin (`/plugin install hooks`) ships 6 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 6 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart, plan-mode, and no-honest hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [no-bash.md](plugins/hooks/hooks/no-bash.md). |
+| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`egrep`/`fgrep`/`rg`/`cat`/`head`/`tail`/`find`/`awk`/`wc`/`perl`, `sed -n` reads), `cat > file` heredocs, and mutating git, plus their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included — see [#18610](https://github.com/anthropics/claude-code/issues/18610)). Rationale + sources: [no-bash.md](plugins/hooks/hooks/no-bash.md). |
 | `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. — injects a directive forcing `EnterPlanMode` as the next tool call. Zero-dependency cross-OS Node. |
 | `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. Zero-dependency cross-OS Node. |
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. Cross-OS Node; spawns `npx`. |
@@ -145,13 +145,13 @@ Claude Code's plugin namespaces are **global** — `agent:research` resolves to 
 
 If you also install [fubits1/svelte-skills](https://github.com/fubits1/svelte-skills), its `frontend:*` and `svelte-5:*` skills reference `agent:research`, `agent:done`, `agent:before-you-act`, etc. — those references resolve against `agent@ronin-skills` installed here. No additional configuration needed.
 
-If you don't install svelte-skills, the `agent` plugin still works fully — every cross-reference in its skills is either intra-plugin (e.g. `agent:plan` references `agent:research`) or uses generic wording (e.g. "your project's validate skill") with no hard dependency on other marketplaces.
+If you don't install svelte-skills, the `agent` plugin still works fully — every `agent:` cross-reference in its skills is intra-plugin (e.g. `agent:plan` references `agent:research`); the few `frontend:` pointers (`frontend:playwright` in `done`, `frontend:editing` in `plan` and `update-skills`) are soft and simply don't resolve without svelte-skills, and `superpowers:` references need the required `superpowers` plugin.
 
 ## Context budget
 
-Claude Code allocates 1% of context window (fallback: 8,000 chars) for skill descriptions. Each description is capped at 250 chars. This marketplace adds ~17 skill descriptions on top of whatever else is installed.
+Claude Code budgets the skill listing at 1% of the model's context window; each entry's combined `description` + `when_to_use` text is capped at 1,536 chars (`skillListingMaxDescChars`). When the listing overflows, the least-invoked skills lose their descriptions first. This marketplace adds ~17 skill descriptions on top of whatever else is installed.
 
-Run `/context` to check for budget warnings. Override with `SLASH_COMMAND_TOOL_CHAR_BUDGET=<chars>`.
+Run `/context` or `/doctor` to check the listing's size. Raise the budget with the `skillListingBudgetFraction` setting or `SLASH_COMMAND_TOOL_CHAR_BUDGET=<chars>`.
 
 Source: [Claude Code skills docs](https://code.claude.com/docs/en/skills)
 

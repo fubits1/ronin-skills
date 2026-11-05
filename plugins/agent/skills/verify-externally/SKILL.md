@@ -76,7 +76,7 @@ Every one of these was used by an agent to skip a step, in the session that prod
 | Excuse | Reality |
 | --- | --- |
 | "I can see it would go red" | Seeing is the step. Three checks that "would obviously" fail printed PASS. |
-| "The check is simple enough to trust" | All four false-passes were simple. Simplicity is what hid them. |
+| "The check is simple enough to trust" | All three false-passes were simple. Simplicity is what hid them. |
 | "I already read it carefully" | Careful reading is the thing measured at near-zero yield. |
 | "A reader costs tokens for a document I know is fine" | The feeling of fine is uncorrelated with fine. That is the finding. |
 | "I'll verify after I finish the next part" | Verification deferred is verification skipped; the artifact ships in between. |

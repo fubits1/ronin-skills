@@ -2,7 +2,7 @@
 // FULL-SCALE validation for no-bash.mjs. Unlike the hand-picked fixtures (run-no-bash-tests /
 // redteam), this does NOT trust the author's enumeration: it cross-checks the hook against an
 // INDEPENDENT POSIX parsing oracle (python3 `shlex`, via oracle.py) and against seeded-fuzz
-// invariants. It imports scan() in-process so 10k+ cases run in well under a second.
+// invariants. It imports scan() in-process so 6k+ cases (18k+ checks) run in well under a second.
 //
 //   node plugins/hooks/hooks/tests/validate-no-bash.mjs            # default seed
 //   node plugins/hooks/hooks/tests/validate-no-bash.mjs 12345      # explicit seed
@@ -33,18 +33,22 @@ let pass = 0;
 let fail = 0;
 const fails = [];
 const oneline = (input) => input.replace(/\n/g, "\\n");
-function check(ok, label, detail) {
-  if (ok) pass++;
-  else {
+function check(passed, label, detail) {
+  if (passed) {
+    pass++;
+  } else {
     fail++;
     fails.push(`FAIL [${label}] ${detail}`);
   }
 }
 
 // hook verdict: "BLOCK"/"ALLOW" + reason tag
-function hook(command) {
+function getVerdict(command) {
   const result = scan(command);
-  return { v: result ? "BLOCK" : "ALLOW", reason: result ? result.tag : null };
+  return {
+    verdict: result ? "BLOCK" : "ALLOW",
+    reason: result ? result.tag : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,26 +90,32 @@ const ARG = {
 };
 
 // 1) banned search tools — active (BLOCK) and inert-in-quotes (ALLOW), across positions/quoting
-for (const [t, reason] of Object.entries(SEARCH)) {
-  const a = ARG[t];
-  add(`${t} ${a}`, "BLOCK", reason, true, "bare");
-  add(`timeout 5 ${t} ${a}`, "BLOCK", reason, false, "wrap:timeout");
-  add(`env ${t} ${a}`, "BLOCK", reason, false, "wrap:env");
-  add(`\\${t} ${a}`, "BLOCK", reason, false, "backslash-escape");
-  add(`/usr/bin/${t} ${a}`, "BLOCK", reason, false, "abs-path");
-  add(`FOO=bar ${t} ${a}`, "BLOCK", reason, false, "var-prefix");
-  add(`(${t} ${a})`, "BLOCK", reason, false, "subshell");
-  for (const s of ["&&", "||", ";", "|"]) {
-    add(`echo hi ${s} ${t} ${a}`, "BLOCK", reason, true, `after ${s}`);
+for (const [tool, reason] of Object.entries(SEARCH)) {
+  const arg = ARG[tool];
+  add(`${tool} ${arg}`, "BLOCK", reason, true, "bare");
+  add(`timeout 5 ${tool} ${arg}`, "BLOCK", reason, false, "wrap:timeout");
+  add(`env ${tool} ${arg}`, "BLOCK", reason, false, "wrap:env");
+  add(`\\${tool} ${arg}`, "BLOCK", reason, false, "backslash-escape");
+  add(`/usr/bin/${tool} ${arg}`, "BLOCK", reason, false, "abs-path");
+  add(`FOO=bar ${tool} ${arg}`, "BLOCK", reason, false, "var-prefix");
+  add(`(${tool} ${arg})`, "BLOCK", reason, false, "subshell");
+  for (const sep of ["&&", "||", ";", "|"]) {
+    add(`echo hi ${sep} ${tool} ${arg}`, "BLOCK", reason, true, `after ${sep}`);
   }
   // the single-quote-escape bug class: `'a\'` closes, then the tool is a real command
-  add(`echo 'a\\' ; ${t} ${a}`, "BLOCK", reason, true, "sq-trailing-backslash");
-  // inert: tool buried in a quote → not a command → ALLOW
-  add(`echo "${t} ${a}"`, "ALLOW", null, true, "in-dquote");
-  add(`echo '${t} ${a}'`, "ALLOW", null, true, "in-squote");
-  add(`echo "x; ${t} ${a}"`, "ALLOW", null, true, "sep+tool-in-dquote");
   add(
-    `echo "say \\"${t} ${a}\\""`,
+    `echo 'a\\' ; ${tool} ${arg}`,
+    "BLOCK",
+    reason,
+    true,
+    "sq-trailing-backslash",
+  );
+  // inert: tool buried in a quote → not a command → ALLOW
+  add(`echo "${tool} ${arg}"`, "ALLOW", null, true, "in-dquote");
+  add(`echo '${tool} ${arg}'`, "ALLOW", null, true, "in-squote");
+  add(`echo "x; ${tool} ${arg}"`, "ALLOW", null, true, "sep+tool-in-dquote");
+  add(
+    `echo "say \\"${tool} ${arg}\\""`,
     "ALLOW",
     null,
     true,
@@ -139,7 +149,7 @@ add("sed -i 's/a/b/' f", "ALLOW", null, false, "sed in-place");
 add("ruby script.rb", "ALLOW", null, false, "ruby not banned");
 
 // 4) git mutate (BLOCK) vs read/inspection (ALLOW)
-for (const m of [
+for (const write of [
   "commit -m x",
   "push origin main",
   "reset --hard HEAD~1",
@@ -170,10 +180,10 @@ for (const m of [
   "-c k=v commit -m x",
   "--no-pager add .",
 ]) {
-  add(`git ${m}`, "BLOCK", "git-mutation", false, `git mutate: ${m}`);
+  add(`git ${write}`, "BLOCK", "git-mutation", false, `git mutate: ${write}`);
 }
 add("git grep foo", "BLOCK", "bash-grep", false, "git grep");
-for (const r of [
+for (const readCommand of [
   "status",
   "log --oneline",
   "diff",
@@ -199,7 +209,7 @@ for (const r of [
   "remote -v",
   "-C /r log",
 ]) {
-  add(`git ${r}`, "ALLOW", null, false, `git read: ${r}`);
+  add(`git ${readCommand}`, "ALLOW", null, false, `git read: ${readCommand}`);
 }
 
 // 5) command builtin
@@ -249,14 +259,14 @@ add("echo hi > /tmp/x", "ALLOW", null, true, "redirect");
 add("gh pr view --json t | jq .t", "ALLOW", null, true, "pipe into jq");
 
 // allowed singles
-for (const c of [
+for (const command of [
   "pnpm test",
   "ls -la",
   "jq .x f.json",
   "make build",
   "echo hi",
 ]) {
-  add(c, "ALLOW", null, true, "legit single");
+  add(command, "ALLOW", null, true, "legit single");
 }
 
 // 8) space-less operators — the hook splits on |/&&/||/; regardless of spacing; the oracle must too
@@ -280,8 +290,8 @@ function mulberry32(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rnd = mulberry32(seed);
-const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+const random = mulberry32(seed);
+const pick = (arr) => arr[Math.floor(random() * arr.length)];
 
 const SEARCH_TOOLS = Object.keys(SEARCH);
 const ALLOWED_TOOLS = ["ls", "echo", "jq", "pnpm", "make", "true"];
@@ -289,25 +299,25 @@ const SEPS = ["&&", "||", ";"]; // command separators (chaining)
 const FUZZ_N = 6000;
 const fuzz = [];
 for (let i = 0; i < FUZZ_N; i++) {
-  const shape = Math.floor(rnd() * 5);
+  const shape = Math.floor(random() * 5);
   if (shape === 0) {
     // banned tool bare → BLOCK (P1)
-    const t = pick(SEARCH_TOOLS);
-    fuzz.push({ cmd: `${t} ${ARG[t]}`, inv: "P1-block", t });
+    const tool = pick(SEARCH_TOOLS);
+    fuzz.push({ cmd: `${tool} ${ARG[tool]}`, inv: "P1-block", tool });
   } else if (shape === 1) {
     // banned tool buried in a quote of echo → ALLOW (P2)
-    const t = pick(SEARCH_TOOLS);
+    const tool = pick(SEARCH_TOOLS);
     const quoteChar = pick(['"', "'"]);
     fuzz.push({
-      cmd: `echo ${quoteChar}x ${t} ${ARG[t]}${quoteChar}`,
+      cmd: `echo ${quoteChar}x ${tool} ${ARG[tool]}${quoteChar}`,
       inv: "P2-allow",
-      t,
+      tool,
     });
   } else if (shape === 2) {
     // two allowed commands joined by a separator → BLOCK chaining
-    const text = pick(SEPS);
+    const separator = pick(SEPS);
     fuzz.push({
-      cmd: `${pick(ALLOWED_TOOLS)} a ${text} ${pick(ALLOWED_TOOLS)} b`,
+      cmd: `${pick(ALLOWED_TOOLS)} a ${separator} ${pick(ALLOWED_TOOLS)} b`,
       inv: "P1-block",
     });
   } else if (shape === 3) {
@@ -316,11 +326,11 @@ for (let i = 0; i < FUZZ_N; i++) {
     fuzz.push({ cmd: `${pick(ALLOWED_TOOLS)} a ${tail}`, inv: "P4-allow" });
   } else {
     // single-quote-trailing-backslash then a banned tool → BLOCK (the regression class)
-    const t = pick(SEARCH_TOOLS);
+    const tool = pick(SEARCH_TOOLS);
     fuzz.push({
-      cmd: `echo 'x\\' ${pick(SEPS)} ${t} ${ARG[t]}`,
+      cmd: `echo 'x\\' ${pick(SEPS)} ${tool} ${ARG[tool]}`,
       inv: "P1-block",
-      t,
+      tool,
     });
   }
 }
@@ -333,13 +343,13 @@ const oracleCmds = [
   ...fuzz.map((f) => f.cmd),
 ];
 let oracleByCmd = null;
-const py = spawnSync("python3", [ORACLE], {
+const oracleRun = spawnSync("python3", [ORACLE], {
   input: oracleCmds.join("\n") + "\n",
   encoding: "utf8",
 });
-if (py.status === 0 && py.stdout) {
+if (oracleRun.status === 0 && oracleRun.stdout) {
   oracleByCmd = new Map();
-  for (const line of py.stdout.split("\n")) {
+  for (const line of oracleRun.stdout.split("\n")) {
     if (!line.trim()) continue;
     try {
       const parsed = JSON.parse(line);
@@ -356,17 +366,19 @@ if (py.status === 0 && py.stdout) {
 
 // Derive an INDEPENDENT verdict from a shlex parse (banned search tool or cat as a real command
 // word in any top-level segment → BLOCK; ≥2 real ;/&&/||-segments → BLOCK chaining; else ALLOW).
-// Both the segment split AND the separator count come from the SAME `o.toks` stream, so they cannot
+// Both the segment split AND the separator count come from the SAME `parsed.toks` stream, so they cannot
 // disagree on space-less operators (`true|grep x` → ["true","|","grep","x"] → grep IS the 2nd
 // segment's first word → BLOCK, matching the hook).
 const BANNED_WORDS = new Set([...SEARCH_TOOLS, "cat"]);
 function oracleVerdict(parsed) {
   if (!parsed || parsed.error || !parsed.toks) return null; // malformed / unparseable → can't oracle
   const segments = [[]];
-  for (const t of parsed.toks) {
-    if (t === ";" || t === "&&" || t === "||" || t === "|" || t === "&") {
+  for (const token of parsed.toks) {
+    if ([";", "&&", "||", "|", "&"].includes(token)) {
       segments.push([]);
-    } else segments[segments.length - 1].push(t);
+    } else {
+      segments[segments.length - 1].push(token);
+    }
   }
   for (const segment of segments) {
     if (segment.length && BANNED_WORDS.has(segment[0])) return "BLOCK";
@@ -382,14 +394,14 @@ function oracleVerdict(parsed) {
 // Check A — labeled corpus
 // ---------------------------------------------------------------------------
 for (const c of cases) {
-  const result = hook(c.cmd);
-  const okV = result.v === c.expect;
-  const okR =
+  const result = getVerdict(c.cmd);
+  const verdictMatches = result.verdict === c.expect;
+  const reasonMatches =
     c.expect === "ALLOW" || c.reason === null || result.reason === c.reason;
   check(
-    okV && okR,
+    verdictMatches && reasonMatches,
     `A:${c.note}`,
-    `want ${c.expect}${c.reason ? "/" + c.reason : ""} got ${result.v}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
+    `want ${c.expect}${c.reason ? "/" + c.reason : ""} got ${result.verdict}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
   );
 }
 
@@ -403,11 +415,11 @@ if (oracleByCmd) {
     const expected = oracleVerdict(parsed);
     if (expected === null) continue;
     oracleChecked++;
-    const result = hook(c.cmd);
+    const result = getVerdict(c.cmd);
     check(
-      result.v === expected,
+      result.verdict === expected,
       `B:${c.note}`,
-      `oracle says ${expected}, hook says ${result.v}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
+      `oracle says ${expected}, hook says ${result.verdict}${result.reason ? "/" + result.reason : ""}  ::  ${oneline(c.cmd)}`,
     );
   }
 }
@@ -418,46 +430,31 @@ if (oracleByCmd) {
 for (const f of fuzz) {
   let result;
   try {
-    result = hook(f.cmd);
+    result = getVerdict(f.cmd);
   } catch (e) {
     check(false, `C:throw`, `scan threw: ${e.message}  ::  ${oneline(f.cmd)}`);
     continue;
   }
   // P3: verdict is always BLOCK or ALLOW
   check(
-    result.v === "BLOCK" || result.v === "ALLOW",
+    result.verdict === "BLOCK" || result.verdict === "ALLOW",
     `C:P3`,
-    `bad verdict ${result.v}  ::  ${oneline(f.cmd)}`,
+    `bad verdict ${result.verdict}  ::  ${oneline(f.cmd)}`,
   );
-  if (f.inv === "P1-block") {
-    check(
-      result.v === "BLOCK",
-      `C:${f.inv}`,
-      `expected BLOCK got ${result.v}  ::  ${oneline(f.cmd)}`,
-    );
-  }
-  if (f.inv === "P2-allow") {
-    check(
-      result.v === "ALLOW",
-      `C:${f.inv}`,
-      `expected ALLOW got ${result.v}  ::  ${oneline(f.cmd)}`,
-    );
-  }
-  if (f.inv === "P4-allow") {
-    check(
-      result.v === "ALLOW",
-      `C:${f.inv}`,
-      `expected ALLOW got ${result.v}  ::  ${oneline(f.cmd)}`,
-    );
-  }
+  const expectedVerdict = f.inv === "P1-block" ? "BLOCK" : "ALLOW";
+  check(
+    result.verdict === expectedVerdict,
+    `C:${f.inv}`,
+    `expected ${expectedVerdict} got ${result.verdict}  ::  ${oneline(f.cmd)}`,
+  );
   // cross-check fuzz against the oracle too (independent)
   if (oracleByCmd) {
     const expected = oracleVerdict(oracleByCmd.get(f.cmd));
     if (expected !== null) {
       check(
-        result.v === expected,
+        result.verdict === expected,
         `C:oracle`,
-        `oracle ${expected} vs hook ${result.v}  ::  ${oneline(f.cmd)}`,
+        `oracle ${expected} vs hook ${result.verdict}  ::  ${oneline(f.cmd)}`,
       );
     }
   }
