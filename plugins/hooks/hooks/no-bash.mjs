@@ -28,8 +28,8 @@ const WRAPPERS = new Set([
   "builtin",
   "xargs",
 ]);
-const WRAPPER_PREFIX = `((${[...WRAPPERS].join("|")})\\s+(-\\S+\\s+|[0-9]+\\s+)*)?([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*`;
 const PATH_PREFIX = "(\\\\?[A-Za-z0-9_./-]*/)?";
+const WRAPPER_PREFIX = `(${PATH_PREFIX}(${[...WRAPPERS].join("|")})\\s+(-\\S+\\s+|[0-9]+\\s+)*){0,8}([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*`;
 const WORD_END = "([^A-Za-z0-9_]|$)";
 const BANNED_CALL = `${WRAPPER_PREFIX}${PATH_PREFIX}(${BANNED})${WORD_END}`;
 // `-[a-z]*c[a-z]*` matches the -c flag alone or fused in a short cluster (-lc/-ic/-cl/-xc), since the
@@ -52,11 +52,13 @@ const RE_DOLLAR_SUB = new RegExp("\\$\\(\\s*" + BANNED_CALL);
 const RE_BACKTICK_SUB = new RegExp("`\\s*" + BANNED_CALL);
 const RE_PROCSUB = new RegExp("[<>]\\(\\s*" + BANNED_CALL);
 
+const SHELL_WORD = String.raw`(?:"(?:\\.|[^"\\])*"|'[^']*'|\\.|[^\s"'\\])+`;
 // git global options that can precede the subcommand (`git -C <path> commit`, `git -c k=v commit`,
 // `git --no-pager log`). Stripped so the subcommand is read correctly — otherwise a global option
 // lets a real mutation slip past (`git -C /repo commit` was allowed).
-const GIT_GLOBAL =
-  /^(-C\s+\S+|-c\s+\S+|--git-dir(=\S+|\s+\S+)|--work-tree(=\S+|\s+\S+)|--namespace(=\S+|\s+\S+)|--exec-path(=\S+)?|--no-pager|--paginate|-p|--bare|--no-replace-objects|--(no-)?literal-pathspecs|--glob-pathspecs|--icase-pathspecs)\s+/;
+const GIT_GLOBAL = new RegExp(
+  String.raw`^((?:-[Cc]\s+|--(?:git-dir|work-tree|namespace)(?:=|\s+))${SHELL_WORD}|--exec-path(?:=${SHELL_WORD})?|--no-pager|--paginate|-p|--bare|--no-replace-objects|--(?:no-)?literal-pathspecs|--glob-pathspecs|--icase-pathspecs)\s+`,
+);
 
 // Shared note for search/read messages. The Grep/Glob tools were removed on native macOS/Linux
 // builds in 2.1.117 (Windows/npm keep them), so the dedicated alternative is fff there; Read works
@@ -143,7 +145,7 @@ function normalizeFirst(commandIn) {
     first = stripBackslashAndPath(firstToken(rest));
     i++;
   }
-  return first;
+  return { first, command: command.replace(/^\s*\S+/, first) };
 }
 
 // Count top-level commands, quote/heredoc/continuation aware, so only a real `&&` / `||` / `;` /
@@ -320,16 +322,16 @@ export function scan(command, bashSearchAllowed = false) {
   if (RE_PROCSUB.test(command)) return block("procsub");
 
   for (const part of splitSegments(command)) {
-    const firstWord = normalizeFirst(part);
+    const { first: firstWord, command: normalized } = normalizeFirst(part);
     if (firstWord === "command") {
       if (/^\s*command\s+-[vV]\b/.test(part)) continue; // existence check, not tool execution
       return block("command-builtin");
     }
     if (firstWord === "git") {
-      if (/^grep\b/.test(stripGitGlobals(part))) {
+      if (/^grep\b/.test(stripGitGlobals(normalized))) {
         return block("bash-grep", buildGrepMessage("git grep")); // content search → Grep
       }
-      if (isGitMutation(part)) return block("git-mutation");
+      if (isGitMutation(normalized)) return block("git-mutation");
       continue;
     }
     if (["grep", "egrep", "fgrep", "rg"].includes(firstWord)) {

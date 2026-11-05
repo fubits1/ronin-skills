@@ -42,13 +42,14 @@ git-cliff --unreleased --tag v0.1.0 --strip header     # the notes the next rele
 
 If `release.sh` can't run (e.g. Windows without bash):
 
-```bash
+Stop if any validation fails.
+
+```text
 # 1. bump `version` in .claude-plugin/marketplace.json (top-level AND every plugins[] entry) AND in each plugins/*/.claude-plugin/plugin.json
 # 2. validate marketplace + plugins
-claude plugin validate . || exit 1
-for plugin_dir in plugins/*/; do
-  claude plugin validate "$plugin_dir" || exit 1
-done
+claude plugin validate .
+claude plugin validate plugins/agent
+claude plugin validate plugins/hooks
 # 3. commit + tag + push (--follow-tags pushes annotated tags only)
 git commit -am "chore(release): v0.1.0"
 git tag -a v0.1.0 -m "v0.1.0"
@@ -78,10 +79,12 @@ docs: clarify install order
 
 Fix-forward on `main`:
 
+Replace `X.Y.Z` with the next patch version before running the release command.
+
 ```bash
 git commit -am "fix(agent): X"
 git push origin main
-./scripts/release.sh 0.1.1   # next patch: bump, validate, commit, tag, push
+./scripts/release.sh X.Y.Z   # next patch: bump, validate, commit, tag, push
 ```
 
 No release branches.

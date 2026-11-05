@@ -7,7 +7,7 @@
 //     matching the event + additionalContext (stdout is the context channel for these two events).
 //   - PostToolUse        = exit 0, never blocks.
 //   - Stop (no-honest)   = exit 0; on a vouching turn, STDOUT JSON hookEventName "Stop".
-//   - Fail-open: malformed/empty/garbage stdin must never crash, hang, or exit non-0/2.
+//   - Fail-open: malformed/empty/garbage stdin must exit 0, never block, crash, or hang.
 //   - Wiring: every hooks.json command resolves when the plugin root contains a space.
 //
 //   node plugins/hooks/hooks/tests/conformance-hooks.mjs
@@ -260,8 +260,8 @@ console.log(
     for (const bad of badInputs) {
       const result = runHook(hook, bad);
       ok(
-        result.code === 0 || result.code === 2,
-        `fail-open ${hook} <- ${JSON.stringify(bad).slice(0, 20)}: exit ${result.code} (must be 0 or 2, never crash/hang)`,
+        result.code === 0,
+        `fail-open ${hook} <- ${JSON.stringify(bad).slice(0, 20)}: exit ${result.code} (must be 0, never block/crash/hang)`,
       );
     }
   }
@@ -273,8 +273,8 @@ console.log(
     tool_input: { command: "echo " + "a".repeat(500000) },
   });
   ok(
-    huge.code === 0 || huge.code === 2,
-    "fail-open no-bash <- 500KB command: bounded, exit 0/2",
+    huge.code === 0,
+    "fail-open no-bash <- 500KB allowed command: bounded, exit 0",
   );
 }
 
