@@ -30,7 +30,7 @@
     {
       "name": "hooks",
       "source": "./plugins/hooks",
-      "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: no-bash, no-absolute-paths, force-plan-mode, auto-formatter, no-honest, no-idle-wait. Install to opt into enforcement. Requires agent@ronin-skills.",
+      "description": "Optional Bash-tool and workflow enforcement hooks for the agent plugin: no-bash, no-absolute-paths, force-plan-mode, auto-formatter, no-honest, no-idle-wait, no-tmp. Install to opt into enforcement. Requires agent@ronin-skills.",
       "version": "0.9.0",
       "author": {
         "name": "fubits1"
@@ -41,6 +41,7 @@
         "no-bash",
         "no-honest",
         "no-idle-wait",
+        "no-tmp",
         "enforcement",
         "bash",
         "pretooluse"

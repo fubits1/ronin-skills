@@ -20,7 +20,7 @@ Two plugins. The skills (`agent`) and the enforcement hooks (`hooks`) install se
 | Plugin | Contents | What it does |
 | --- | --- | --- |
 | [agent](plugins/agent/) | 17 skills | Research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills/guidance only, no global side effects. Requires the `superpowers` plugin. |
-| [hooks](plugins/hooks/) | 6 hooks | Optional enforcement: no-bash (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, no-honest (stop the agent vouching with `honest` instead of showing evidence), no-idle-wait (keep working while background tasks run), plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
+| [hooks](plugins/hooks/) | 7 hooks | Optional enforcement: no-bash (route Bash file-read/search to dedicated tools), no-absolute-paths, force-plan-mode, auto-formatter, no-honest (stop the agent vouching with `honest` instead of showing evidence), no-idle-wait (keep working while background tasks run), no-tmp (no scratch files in the temp dir), plus a SessionStart `discipline` directive. Install to opt into enforcement. Requires `agent`. |
 
 ## Installation
 
@@ -96,7 +96,7 @@ This loads the skills **in addition** to anything in `~/.claude/skills/`. On a d
 
 ## Hooks
 
-The optional **`hooks`** plugin (`/plugin install hooks`) ships 6 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
+The optional **`hooks`** plugin (`/plugin install hooks`) ships 7 enforcement hooks (plus a SessionStart directive) that back the `agent` skills. They are global once installed, and require the `agent` plugin (the SessionStart and plan-mode hooks reference `agent` skills):
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
@@ -106,6 +106,7 @@ The optional **`hooks`** plugin (`/plugin install hooks`) ships 6 enforcement ho
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. Cross-OS Node; spawns `npx`. |
 | `no-honest.mjs` | Stop | Non-blocking nudge: if any message this turn says `honest` or `honestly` (the agent vouching for its own truthfulness instead of showing proof), injects `additionalContext` to show evidence next time. Advisory — the enforceable rule lives in `agent:discipline`; `decision:block` is avoided (it crashes Opus 4.x thinking sessions → 400). Zero-dependency Node; bounded read, flat ~28 ms; loop-guarded. Rationale + research: [no-honest.md](plugins/hooks/hooks/no-honest.md). |
 | `no-idle-wait.mjs` | Stop | If the Stop input lists `background_tasks` with status `running`, returns `additionalContext`, which continues the turn once: take the next independent task instead of ending the turn idle (backs the `agent:discipline` background-work rule). Silent when nothing runs; loop-guarded by `stop_hook_active`. Zero-dependency Node. |
+| `no-tmp.mjs` | PreToolUse (Bash\|Write\|Edit\|NotebookEdit) | Blocks scratch work in the temp directory: Bash commands that name `/tmp`, `/private/tmp`, `/var/tmp`, `$TMPDIR`, `%TEMP%`, `%TMP%` or the OS temp dir, and Write/Edit/NotebookEdit paths inside a temp dir. Files there are out of the user's sight; the message tells the agent to use a folder the user can browse, or ask where. The Read tool stays allowed. Also blocks Claude Code's [session scratchpad](https://code.claude.com/docs/en/claude-directory#session-scratchpad-directory), which lives under the temp dir; set `CLAUDE_CODE_TMPDIR` to a visible folder to move it out. Zero-dependency Node. |
 
 A `SessionStart` hook (`session-start.mjs`, Node) also injects a mandatory directive to invoke the `discipline` skill at the start of every session.
 

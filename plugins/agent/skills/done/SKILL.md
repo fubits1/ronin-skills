@@ -29,7 +29,7 @@ Complete every gate below, in order, before declaring done. Skipping a gate is h
 
 - Navigate to every affected page via Playwright MCP.
 - For behavior changes, reproduce the exact user flow via Playwright; automate multi-step flows: no ad-hoc evaluate with unreliable timeouts.
-- For CSS/layout, take BEFORE and AFTER screenshots to `/tmp/`; visually confirm. Report screenshot paths (Gate 7).
+- For CSS/layout, take BEFORE and AFTER screenshots (location: `frontend:playwright`); visually confirm. Report screenshot paths (Gate 7).
 
 ## 3. Re-run flaky suites
 
@@ -44,7 +44,7 @@ Complete every gate below, in order, before declaring done. Skipping a gate is h
 ## 5. Remove your own debug instrumentation
 
 - Any debugging instrumentation you added (`console.log`, `dbg!`, `print(...)`, temp constants, commented-out experiments) must be gone. Grep touched files for the markers you added and confirm zero remain. Don't trust memory.
-- Delete scratch files you created too. (Background servers: `agent:dev-server`. Screenshots belong in `/tmp/`: `frontend:playwright`.)
+- Delete scratch files you created too. (Background servers: `agent:dev-server`. Screenshot location: `frontend:playwright`.)
 
 ## 6. Lint edited CI workflows
 
