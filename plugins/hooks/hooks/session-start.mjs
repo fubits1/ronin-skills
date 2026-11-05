@@ -21,7 +21,7 @@ try {
     realpathSync(process.argv[1]) ===
     realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  runAsHook = true;
+  // realpath failed: keep the default and run
 }
 if (runAsHook) {
   process.stdout.write(JSON.stringify(sessionStartPayload) + "\n");

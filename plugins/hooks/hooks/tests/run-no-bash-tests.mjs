@@ -13,13 +13,14 @@ const HOOK = join(HERE, "..", "no-bash.mjs");
 delete process.env.NO_BASH_SEARCH_FALLBACK;
 let pass = 0;
 let fail = 0;
-const oneline = (text) => text.replace(/\n/g, "\\n");
+const oneline = (text) => String(text).replace(/\n/g, "\\n");
 function run(command, env) {
   const payload = JSON.stringify({ tool_input: { command } });
   const r = spawnSync(process.execPath, [HOOK], {
     input: payload,
     encoding: "utf8",
     env: { ...process.env, ...env },
+    timeout: 10000, // a hook that hangs is a failure, not a pass
   });
   if (r.error) return { code: -1, stderr: "spawn error: " + r.error.message };
   // status is null when the process is killed by a signal (e.g. timeout) — never read that as ALLOW.
@@ -125,6 +126,46 @@ console.log("\n=== wrappers / substitutions / shell-wrapping BLOCK ===");
 runCase(BLOCK, "abs-path-find", "/usr/bin/find .");
 runCase(BLOCK, "backslash-grep", "\\grep foo");
 runCase(BLOCK, "timeout-grep", "timeout 5 grep foo f");
+runCase(BLOCK, "abs-path-wrapper", "/usr/bin/env grep foo f");
+runCase(BLOCK, "backslash-wrapper", "\\timeout 5 grep foo f");
+runCase(BLOCK, "git-C-grep", "git -C . grep foo");
+runCase(BLOCK, "git-c-grep", "git -c core.pager=cat grep foo");
+runCase(BLOCK, "dollar-sub-abs-path", "echo $(/usr/bin/grep foo f)");
+runCase(BLOCK, "bashc-abs-path", 'bash -c "/usr/bin/grep foo f"');
+runCase(BLOCK, "backtick-abs-path", "echo `/usr/bin/cat f`");
+runCase(BLOCK, "procsub-abs-path", "diff <(/usr/bin/cat a) b");
+runCase(
+  BLOCK,
+  "dollar-sub-qualified-wrapper",
+  "echo $(/usr/bin/env grep foo f)",
+);
+runCase(BLOCK, "bashc-stacked-wrappers", 'bash -c "env timeout 5 grep foo f"');
+runCase(BLOCK, "backtick-qualified-wrapper", "echo `/usr/bin/env cat f`");
+runCase(BLOCK, "procsub-stacked-wrappers", "diff <(env timeout 5 cat a) b");
+for (const prefix of [
+  "env git",
+  "/usr/bin/env git",
+  "/usr/bin/git",
+  "FOO=bar git",
+]) {
+  runCase(BLOCK, "wrapped-git-commit", `${prefix} commit -m x`);
+  runCase(BLOCK, "wrapped-git-grep", `${prefix} -C . grep foo`);
+  runCase(ALLOW, "wrapped-git-status", `${prefix} status`);
+  runCase(ALLOW, "wrapped-git-mv", `${prefix} mv old new`);
+}
+for (const option of [
+  '-C "/example/my repo"',
+  "-C /example/my\\ repo",
+  '-c core.pager="less -FRX"',
+  '--git-dir="/example/my repo/.git"',
+  "--work-tree '/example/my repo'",
+  '--namespace="my namespace"',
+  '--exec-path="/example/my tools"',
+]) {
+  runCase(BLOCK, "quoted-git-mutation", `git ${option} commit -m x`);
+  runCase(BLOCK, "quoted-git-search", `git ${option} grep foo`);
+  runCase(ALLOW, "quoted-git-read", `git ${option} status`);
+}
 runCase(BLOCK, "xargs-grep", "xargs grep foo");
 runCase(BLOCK, "xargs-I-grep", "xargs -I {} grep foo {}");
 runCase(BLOCK, "dollar-sub", "echo $(grep foo f)");
@@ -244,21 +285,8 @@ console.log(
 
 console.log("\n=== fail-open on empty / absent command ===");
 runCase(ALLOW, "empty-string", "");
-{
-  // absent command key → fail open (exit 0)
-  const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ tool_input: {} }),
-    encoding: "utf8",
-  });
-  const code = r.status === null ? -2 : r.status;
-  if (code === ALLOW) {
-    console.log("PASS  [absent-command ALLOW]  {tool_input:{}}");
-    pass++;
-  } else {
-    console.log(`FAIL  [absent-command want=0 got=${code}]  {tool_input:{}}`);
-    fail++;
-  }
-}
+// absent command key → fail open (exit 0)
+runCase(ALLOW, "absent-command", undefined);
 
 console.log(`\n=== Summary: ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);

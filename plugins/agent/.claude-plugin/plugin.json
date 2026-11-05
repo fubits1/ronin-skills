@@ -4,5 +4,6 @@
   "author": {
     "name": "fubits1"
   },
-  "description": "AI coding agent discipline: research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills only; for the enforcement hooks install the separate hooks@ronin-skills plugin."
+  "icon": "./.claude-plugin/icon.png",
+  "description": "AI coding agent discipline: research, planning, self-checks, completion verification, git/CI workflow, package-manager and security rules. Skills only; for the enforcement hooks install the separate hooks@ronin-skills plugin. Requires superpowers plugin."
 }

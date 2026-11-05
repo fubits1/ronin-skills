@@ -3,6 +3,8 @@
 // fix-formatting.mjs, session-start.mjs, no-tmp.mjs. Each hook exports a pure core function (tested
 // in-process) and is also spawned as a subprocess to check stdin parsing, exit codes, and
 // stdout/stderr wiring. no-idle-wait.mjs exports no core and is tested as a subprocess only.
+// no-honest.mjs's pure core (detectVouching / turnAssistantText) is tested in-process here; its
+// subprocess checks live in run-no-honest-tests.mjs.
 //
 //   node plugins/hooks/hooks/tests/run-hook-tests.mjs
 
@@ -56,14 +58,17 @@ ok(
 ok(checkAbsolutePaths("cat src/x", ROOT, HOME) === null, "relative → allow");
 ok(checkAbsolutePaths("git diff", ROOT, HOME) === null, "no path → allow");
 // tilde + $HOME forms when root is under home
-const HROOT = `${HOME}/proj`;
-ok(checkAbsolutePaths("cd ~/proj", HROOT, HOME) !== null, "tilde form → block");
+const HOME_ROOT = `${HOME}/proj`;
 ok(
-  checkAbsolutePaths("cd $HOME/proj", HROOT, HOME) !== null,
+  checkAbsolutePaths("cd ~/proj", HOME_ROOT, HOME) !== null,
+  "tilde form → block",
+);
+ok(
+  checkAbsolutePaths("cd $HOME/proj", HOME_ROOT, HOME) !== null,
   "$HOME form → block",
 );
 ok(
-  checkAbsolutePaths("cd ~/other", HROOT, HOME) === null,
+  checkAbsolutePaths("cd ~/other", HOME_ROOT, HOME) === null,
   "tilde non-root → allow",
 );
 // root IS home
@@ -73,62 +78,52 @@ ok(
 );
 ok(checkAbsolutePaths("", ROOT, HOME) === null, "empty command → allow");
 // subprocess wiring
-const nap1 = runHook(
-  "no-absolute-paths.mjs",
-  { tool_input: { command: `ls ${ROOT}/a` } },
-  { CLAUDE_PROJECT_DIR: ROOT },
-);
+const runNoAbsolutePaths = (payload, env = { CLAUDE_PROJECT_DIR: ROOT }) =>
+  runHook("no-absolute-paths.mjs", payload, env);
+const absoluteRoot = runNoAbsolutePaths({
+  tool_input: { command: `ls ${ROOT}/a` },
+});
 ok(
-  nap1.code === 2 && nap1.stderr.includes("BLOCKED"),
+  absoluteRoot.code === 2 && absoluteRoot.stderr.includes("BLOCKED"),
   "subprocess: abs root → exit 2 + message",
 );
-const nap2 = runHook(
-  "no-absolute-paths.mjs",
-  { tool_input: { command: "ls a" } },
-  { CLAUDE_PROJECT_DIR: ROOT },
-);
-ok(nap2.code === 0, "subprocess: relative → exit 0");
-const nap3 = runHook(
-  "no-absolute-paths.mjs",
-  { tool_input: {} },
-  { CLAUDE_PROJECT_DIR: ROOT },
-);
-ok(nap3.code === 0, "subprocess: absent command → exit 0 (fail open)");
+const relativePath = runNoAbsolutePaths({ tool_input: { command: "ls a" } });
+ok(relativePath.code === 0, "subprocess: relative → exit 0");
+const absentCommand = runNoAbsolutePaths({ tool_input: {} });
+ok(absentCommand.code === 0, "subprocess: absent command → exit 0 (fail open)");
 // root falls back to $PWD (logical) when CLAUDE_PROJECT_DIR is unset — must match the bash original,
 // which used `${CLAUDE_PROJECT_DIR:-$PWD}` (NOT the symlink-resolved process.cwd()).
-const nap4 = runHook(
-  "no-absolute-paths.mjs",
+const pwdFallback = runNoAbsolutePaths(
   { tool_input: { command: "ls /fake/logical/root/x" } },
   { CLAUDE_PROJECT_DIR: "", PWD: "/fake/logical/root" },
 );
 ok(
-  nap4.code === 2,
+  pwdFallback.code === 2,
   "subprocess: PWD fallback (no CLAUDE_PROJECT_DIR) → exit 2",
 );
 // stdin `cwd` follows Bash `cd`: from outside root, the absolute root is the only way back
-const nap5 = runHook(
-  "no-absolute-paths.mjs",
-  { cwd: "/elsewhere/tmp", tool_input: { command: `cd ${ROOT}` } },
-  { CLAUDE_PROJECT_DIR: ROOT },
+const cdBack = runNoAbsolutePaths({
+  cwd: "/elsewhere/tmp",
+  tool_input: { command: `cd ${ROOT}` },
+});
+ok(cdBack.code === 0, "subprocess: shell outside root, cd back → exit 0");
+const shellUnderRoot = runNoAbsolutePaths({
+  cwd: `${ROOT}/src`,
+  tool_input: { command: `ls ${ROOT}/a` },
+});
+ok(shellUnderRoot.code === 2, "subprocess: shell under root → exit 2");
+const siblingPrefix = runNoAbsolutePaths({
+  cwd: `${ROOT}-other`,
+  tool_input: { command: `ls ${ROOT}/a` },
+});
+ok(
+  siblingPrefix.code === 0,
+  "subprocess: sibling dir sharing the root prefix → exit 0",
 );
-ok(nap5.code === 0, "subprocess: shell outside root, cd back → exit 0");
-const nap6 = runHook(
-  "no-absolute-paths.mjs",
-  { cwd: `${ROOT}/src`, tool_input: { command: `ls ${ROOT}/a` } },
-  { CLAUDE_PROJECT_DIR: ROOT },
-);
-ok(nap6.code === 2, "subprocess: shell under root → exit 2");
-const nap7 = runHook(
-  "no-absolute-paths.mjs",
-  { cwd: `${ROOT}-other`, tool_input: { command: `ls ${ROOT}/a` } },
-  { CLAUDE_PROJECT_DIR: ROOT },
-);
-ok(nap7.code === 0, "subprocess: sibling dir sharing the root prefix → exit 0");
 {
   // stdin `cwd` arrives symlink-resolved, the root stays logical: a shell AT the root still blocks
   const logicalRoot = mkdtempSync(join(tmpdir(), "nap-"));
-  const nap8 = runHook(
-    "no-absolute-paths.mjs",
+  const symlinkedRoot = runNoAbsolutePaths(
     {
       cwd: realpathSync(logicalRoot),
       tool_input: { command: `ls ${logicalRoot}/a` },
@@ -136,7 +131,7 @@ ok(nap7.code === 0, "subprocess: sibling dir sharing the root prefix → exit 0"
     { CLAUDE_PROJECT_DIR: logicalRoot },
   );
   rmSync(logicalRoot, { recursive: true });
-  ok(nap8.code === 2, "subprocess: shell at symlinked root → exit 2");
+  ok(symlinkedRoot.code === 2, "subprocess: shell at symlinked root → exit 2");
 }
 
 console.log("=== force-plan-mode ===");
@@ -179,14 +174,14 @@ ok(
   "plan thisé (non-ASCII, not punct) → null",
 );
 ok(planDirective("plan this") === null, "plan this+control (not punct) → null");
-const fpm1 = runHook("force-plan-mode.mjs", { prompt: "/plan this feature" });
+const plan = runHook("force-plan-mode.mjs", { prompt: "/plan this feature" });
 ok(
-  fpm1.code === 0 && fpm1.stdout.includes("EnterPlanMode"),
+  plan.code === 0 && plan.stdout.includes("EnterPlanMode"),
   "subprocess: /plan → directive on stdout, exit 0",
 );
-const fpm2 = runHook("force-plan-mode.mjs", { prompt: "hello there" });
+const unrelated = runHook("force-plan-mode.mjs", { prompt: "hello there" });
 ok(
-  fpm2.code === 0 && fpm2.stdout.trim() === "",
+  unrelated.code === 0 && unrelated.stdout.trim() === "",
   "subprocess: unrelated → no output, exit 0",
 );
 
@@ -198,8 +193,8 @@ ok(formatterFor("doc.mdx") === null, ".mdx → skip");
 ok(formatterFor("") === null, "empty → null");
 ok(formatterFor(undefined) === null, "undefined → null");
 // never blocks: absent file_path → no formatter spawned → exit 0
-const fmt1 = runHook("fix-formatting.mjs", { tool_input: {} });
-ok(fmt1.code === 0, "subprocess: absent file_path → exit 0 (no spawn)");
+const absentPath = runHook("fix-formatting.mjs", { tool_input: {} });
+ok(absentPath.code === 0, "subprocess: absent file_path → exit 0 (no spawn)");
 // formatterSpec per-OS (the Windows .cmd fix — can't spawn npx.cmd without a shell):
 const unix = formatterSpec("prettier", "a/b.ts", "linux");
 ok(
@@ -250,17 +245,17 @@ ok(
   ),
   "payload mentions /discipline",
 );
-const ss = runHook("session-start.mjs", {});
-let ssParsed = null;
+const sessionStart = runHook("session-start.mjs", {});
+let sessionStartJson = null;
 try {
-  ssParsed = JSON.parse(ss.stdout);
+  sessionStartJson = JSON.parse(sessionStart.stdout);
 } catch {
   /* leave null */
 }
 ok(
-  ss.code === 0 &&
-    ssParsed &&
-    ssParsed.hookSpecificOutput.hookEventName === "SessionStart",
+  sessionStart.code === 0 &&
+    sessionStartJson &&
+    sessionStartJson.hookSpecificOutput.hookEventName === "SessionStart",
   "subprocess: emits valid SessionStart JSON, exit 0",
 );
 

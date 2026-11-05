@@ -23,8 +23,8 @@ jobs:
       - name: Validate marketplace + plugins
         run: |
           claude plugin validate . || exit 1
-          for d in plugins/*/; do
-            claude plugin validate "$d" || exit 1
+          for plugin_dir in plugins/*/; do
+            claude plugin validate "$plugin_dir" || exit 1
           done
 
   lint:
@@ -58,9 +58,9 @@ jobs:
         run: node plugins/hooks/hooks/tests/validate-no-bash.mjs
       - name: no-bash benchmark (perf / no-ReDoS gate)
         run: node plugins/hooks/hooks/tests/bench-no-bash.mjs
-      - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start / no-idle-wait / no-tmp)
+      - name: workflow hooks (no-absolute-paths / force-plan-mode / fix-formatting / session-start / no-idle-wait / no-honest core / no-tmp)
         run: node plugins/hooks/hooks/tests/run-hook-tests.mjs
       - name: protocol-conformance + fail-open harness (all hooks, full stdin envelope)
         run: node plugins/hooks/hooks/tests/conformance-hooks.mjs
-      - name: Run no-honest hook tests
+      - name: no-honest Stop hook tests
         run: node plugins/hooks/hooks/tests/run-no-honest-tests.mjs

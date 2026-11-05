@@ -53,7 +53,7 @@ export function checkAbsolutePaths(command, root, homeDir) {
   return null;
 }
 
-function resolved(path) {
+function resolvePath(path) {
   try {
     return realpathSync(path);
   } catch {
@@ -84,14 +84,14 @@ function main() {
   /**
    * shell outside root: allow
    *
-   * the block's premise "cwd IS already that path" holds only while the shell sits at or under
-   * root. stdin `cwd` follows Bash `cd`, CLAUDE_PROJECT_DIR does not, so after `cd /tmp/x` the
+   * The block's premise "cwd IS already that path" holds only while the shell sits at or under
+   * root. Stdin `cwd` follows Bash `cd`, CLAUDE_PROJECT_DIR does not, so after `cd /tmp/x` the
    * absolute root is the only way back. `cwd` arrives symlink-resolved (/private/tmp/x), so compare
-   * resolved forms
+   * resolved forms.
    */
   if (typeof input.cwd === "string" && input.cwd !== "") {
-    const cwd = resolved(input.cwd);
-    const realRoot = resolved(root);
+    const cwd = resolvePath(input.cwd);
+    const realRoot = resolvePath(root);
     if (cwd !== realRoot && !cwd.startsWith(realRoot + sep)) return;
   }
   const homeDir = process.env.HOME || homedir();
@@ -102,7 +102,7 @@ function main() {
   }
 }
 
-// Run only when executed directly; export checkAbsolutePaths when imported (tests). realpath both
+// Run only when executed directly; export checkAbsolutePaths when imported (tests). Realpath both
 // sides so a symlinked invocation path still matches; on any uncertainty default to running.
 let runAsHook = true;
 try {
@@ -110,7 +110,7 @@ try {
     realpathSync(process.argv[1]) ===
     realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  runAsHook = true;
+  // realpath failed: keep the default and run
 }
 if (runAsHook) {
   try {

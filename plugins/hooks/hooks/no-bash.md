@@ -1,7 +1,7 @@
 # no-bash — rationale
 
-Why this hook exists and why it is built this way. Every claim is sourced. The one-line
-header in the hook is too short to hold this, so the reasoning lives here next to the
+Why this hook exists and why it is built this way. Every claim is sourced. The header
+comment in the hook is too short to hold this, so the reasoning lives here next to the
 code.
 
 ## Runtime: `no-bash.mjs` (Node, cross-OS)
@@ -98,13 +98,13 @@ runtime dependencies is the right trade.
 2. Pre-extraction scans catch banned tools the segment splitter can't see: `bash -c "…"`,
    `$(…)` and backtick command substitution, `<(…)`/`>(…)` process substitution, and
    `node -e`/`python -c` shelling out via subprocess APIs.
-3. Segment split on `&&`, `||`, `;`, `|`, and background `&`, with `&&` matched before bare
-   `&` so a logical-AND isn't mis-split. Each segment is checked on its own, so a banned
-   tool can't ride along after an approved-looking first command.
-4. `normalize_first` reduces a segment to its effective first word, mirroring Claude Code's
-   own matcher: it strips `VAR=value` prefixes, leading group-openers (`(` / `{`), leading
-   backslash, path qualification, and process wrappers (`timeout`, `nice`, `env`, `exec`,
-   `xargs` — including the `-I {}` replstr of the `xargs -I {} grep …` idiom).
+3. Quote-aware segment split on `&&`, `||`, `;`, `|`, background `&` and newline outside
+   quotes; a doubled `&&`/`||` is consumed as one operator. Each segment is checked alone,
+   so a banned tool can't ride along after an approved-looking first command.
+4. `normalizeFirst` reduces a segment to its effective first word, mirroring Claude Code's own
+   matcher: it strips `VAR=value` prefixes, leading group-openers (`(` / `{`), leading backslash,
+   path qualification, and process wrappers (`timeout`, `time`, `nice`, `nohup`, `stdbuf`, `env`,
+   `exec`, `eval`, `builtin`, `xargs` — including the `-I {}` replstr of the `xargs -I {} grep …` idiom).
 5. Per-tool arms block the banned first word with a message naming the right tool. Special
    cases discriminate read from write, so the hook does not false-positive on a legit read:
    - `cat` routes to `Write` only for a real stdout file-write (`cat … > f`, `>>`) or a
@@ -115,7 +115,7 @@ runtime dependencies is the right trade.
      included, because `sed -i 's///'` covers in-place editing. `ruby` is not banned.
    - `command -v foo` (POSIX existence check) passes; `command grep …` (execution bypass)
      blocks.
-   - `git` is mutation-vs-read discriminated by subcommand (`gitMutates`): a write form
+   - `git` is mutation-vs-read discriminated by subcommand (`isGitMutation`): a write form
      blocks (`commit`, `push`, `reset`, `stash`/`stash pop`, `clean -fd`, `apply`, `branch
      -D`, `worktree add`, `submodule update`, `git -C <path> commit`, …) while the read /
      inspection form of the same subcommand passes (`git stash list`, `git tag -l`,
@@ -134,8 +134,8 @@ runtime dependencies is the right trade.
    NOT count. Chaining is a documented permission-bypass class (claude-code
    #13371/#4956/#28784/#16180/#20085): the native matcher can validate only the first segment
    of a chain. It's also the agent's bash-one-liner reflex, not a need; Claude Code persists
-   the Bash working dir across calls, so even `cd dir && cmd` is unnecessary. Pipes into `jq`
-   and redirections (`>`, `2>&1`) are not chaining and pass.
+   the Bash working dir across calls, so even `cd dir && cmd` is unnecessary. Pipes (any `|`,
+   e.g. `| jq`) and redirections (`>`, `2>&1`) are not chaining and pass.
 
 A bypass that slips a banned tool through is a bug to fix here, not a loophole to use.
 
@@ -155,7 +155,7 @@ names the arm that catches the shape; `GAP` is a deliberate non-goal under the t
 | `sed -i 's///'` (GNU), `sed -i '' 's///'` (macOS) | passes by design | the sanctioned in-place edit, and what replaces `perl -pi`; BSD sed reads the argument after `-i` as the backup suffix |
 | `ruby`, `lua`, `php`, `busybox`, `xxd` | GAP | zero observed use here; add one only when a replay shows the reflex, never on symmetry |
 | banned tool via wrapper, `$(…)`, backticks, `<(…)`, `bash -c` | GUARDED | pre-extraction scans |
-| `/usr/bin/grep`, `\grep`, `VAR=x grep` | GUARDED | `normalizeFirst` |
+| `/usr/bin/grep`, `\grep`, `VAR=x grep`, `/usr/bin/env grep`, `git -C . grep` | GUARDED | `normalizeFirst`, `stripGitGlobals` |
 | `bash -c "perl …"`, `$(perl …)`, `` `perl …` ``, `<(perl …)` | GUARDED | `perl` is in `BANNED`, so every pre-extraction scan covers it |
 | `python -c "open(f).read()"`, `node -e "fs.readFileSync"` | GAP | both have real non-reader uses here (`jq` fallback, scripts); no reader-shaped instance in the replay. Revisit from evidence, not symmetry |
 | `ugrep`, `bfs` | pass, unrecommended | they pass (not in `BANNED`, no arm) and stay that way — no observed reflex to block. They are also not recommended: "the raw-dump search this hook routes away from", below |
@@ -176,10 +176,10 @@ write-blocklist was defeated by `perl -i -pe`.
 Every block goes through one `block()` helper, because how the rejection reads back to the
 model matters as much as the block itself. The model has repeatedly mislabeled hook /
 permission blocks as "the user rejected me" and narrated past its own mistake, so each block
-is prefixed `[deterministic hook block from no-bash.mjs — NOT a user rejection]` followed by a
-structured `BLOCKED | reason=…` line. The paired skill rule (`no-bash/SKILL.md` → "When the
-hook blocks a command") tells the model to read the `reason=` and switch to the dedicated
-tool rather than re-issue the same command.
+is prefixed `[deterministic hook block from no-bash.mjs — NOT a user rejection]` followed on the
+same line by a structured `BLOCKED | reason=…` tag, then the teaching message on its own line.
+The paired skill rule (`no-bash/SKILL.md` → "When the hook blocks a command") tells the model
+to read the `reason=` and switch to the dedicated tool rather than re-issue the same command.
 
 ## The Grep/Glob tools can be missing on native builds (2.1.117)
 
@@ -238,8 +238,8 @@ properties:
 
 - **Opt-in, default off.** Absent the variable nothing changes. It is global and silent once set,
   so unset it when fff is back.
-- **Search names only.** `cat`, `head`, `tail`, `sed -n`, `awk`, `wc` and `perl` stay blocked —
-  `Read` is present on every build, so reads never lack an alternative. The setting
+- **Search names only.** `cat`, `head`, `tail`, `sed -n`, `awk`, `wc`, `perl` and `git grep` stay
+  blocked — `Read` is present on every build, so reads never lack an alternative. The setting
   allows command names, not purposes: an allowed `grep`/`find` can still print a whole file
   (`grep '' f`, `find … -exec cat {} \;`). The hook does not try to catch that; an agent does not
   write these to get around the hook (see the threat model).

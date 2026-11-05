@@ -6,16 +6,16 @@
 
 Hard-enforcing assistant output is impossible in Claude Code by design, and `decision:block` on `Stop` is actively harmful:
 
-- **It crashes the model.** `decision:block` on `Stop` during an Opus 4.6/4.7/4.8 extended-thinking session corrupts the finished message's thinking blocks on re-entry → API 400 ([#63287](https://github.com/anthropics/claude-code/issues/63287), open). `additionalContext`-only never re-enters or modifies the message, so it sidesteps this.
+- **It crashes the model.** `decision:block` on `Stop` during an Opus 4.6/4.7/4.8 extended-thinking session corrupts the finished message's thinking blocks on re-entry → API 400 ([#63287](https://github.com/anthropics/claude-code/issues/63287), closed not_planned). `additionalContext` also continues the turn (hooks docs, "Stop decision control").
 - **Blocking is won't-fix.** [#3656](https://github.com/anthropics/claude-code/issues/3656) (closed, not_planned) — some builds ignore `decision:block` entirely.
-- **Output enforcement doesn't exist.** Only `MessageDisplay` (display-only) and `Stop` (after the fact, `additionalContext` only) touch the model's text; the "rewrite the assistant message" request ([#61152](https://github.com/anthropics/claude-code/issues/61152)) is closed/duplicate. The docs' position: output hooks are persuasion, not enforcement.
+- **Output enforcement doesn't exist.** Only `MessageDisplay` (display-only) and `Stop` (after the fact: `additionalContext` or `decision:block`, neither rewrites the text) touch the model's text; the "rewrite the assistant message" request ([#61152](https://github.com/anthropics/claude-code/issues/61152)) is closed/duplicate. The docs' position: output hooks are persuasion, not enforcement.
 - **The model evades banned-word hooks** by splitting the word mid-stream ([#29691](https://github.com/anthropics/claude-code/issues/29691)).
 
 So the reliable layer is the `agent:discipline` rule ("never self-certify with `honest`/`honestly` — show the evidence"), carried into every session by the `SessionStart` directive. This hook is opportunistic reinforcement.
 
 ## Mechanism
 
-- On a match it prints `{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"…"}}` and exits 0. The turn ends normally; the model reads the nudge on the next turn. No `decision:block`, no 400, no loop.
+- On a match it prints `{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"…"}}` and exits 0. The turn continues once so the model can act on the nudge; the transcript labels it `Stop hook feedback`, not a hook error. No `decision:block`. The `stop_hook_active` guard and Claude Code's 8-continuation cap prevent a loop.
 - Loop guard (`stop_hook_active`), and a bounded **256 KB** tail read of the transcript (flat latency, no full-file slurp). Scans every assistant text block in the current turn — from the last genuine user prompt onward — strips fenced and inline code, lowercases, matches `\bhonest(ly)?\b`.
 
 ## Scope
@@ -38,5 +38,6 @@ The bounded read keeps latency flat; an unbounded full-file slurp was O(session 
 - **Advisory only** — the model can ignore `additionalContext`. The `agent:discipline` rule is the real backstop.
 - **Plugin `Stop` hooks are unreliable**: `$CLAUDE_PLUGIN_ROOT` may not be injected ([#66557](https://github.com/anthropics/claude-code/issues/66557)), `node` may be missing from the hook's PATH ([#64064](https://github.com/anthropics/claude-code/issues/64064)), and `Stop` fires unreliably on Windows/VSCode ([#40029](https://github.com/anthropics/claude-code/issues/40029)). When the hook doesn't fire, the skill rule still applies.
 - Can't distinguish using the word from discussing it; needs `node` on `PATH`.
+- Reads `transcript_path`, which the hooks docs say isn't guaranteed to include the final message at Stop time on all versions; `last_assistant_message` holds only the final message, not every message of the turn.
 
 Tested by `tests/run-no-honest-tests.mjs` (run in CI). Sources: the Claude Code hooks docs, deslop's "False Vulnerability" trope, and the issues above.

@@ -66,14 +66,14 @@ function main() {
   }
 }
 
-// Run only when executed directly; export formatterFor when imported (tests).
+// Run only when executed directly; export formatterFor and formatterSpec when imported (tests).
 let runAsHook = true;
 try {
   runAsHook =
     realpathSync(process.argv[1]) ===
     realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  runAsHook = true;
+  // realpath failed: keep the default and run
 }
 if (runAsHook) {
   try {

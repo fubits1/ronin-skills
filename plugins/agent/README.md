@@ -32,12 +32,16 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 
 ## Hooks
 
-The enforcement hooks that back these skills (no-bash, no-absolute-paths, force-plan-mode, auto-formatter, and a SessionStart `discipline` directive) ship separately in the **`hooks`** plugin, so enforcement is opt-in. Install it with `/plugin install hooks@ronin-skills`. See [plugins/hooks/README.md](../hooks/README.md).
+The enforcement hooks that back these skills (no-bash, no-absolute-paths, force-plan-mode, auto-formatter, no-honest, no-idle-wait, and a SessionStart `discipline` directive) ship separately in the **`hooks`** plugin, so enforcement is opt-in. Install it with `/plugin install hooks@ronin-skills`. See [plugins/hooks/README.md](../hooks/README.md).
 
 ## Prerequisites
 
-The `superpowers` plugin must be installed. The `plan` skill references `superpowers:systematic-debugging` for complex bug investigations.
+The `superpowers` plugin must be installed. `plan` references `superpowers:systematic-debugging` for complex bug investigations; `verify-externally` references `superpowers:verification-before-completion` and `superpowers:test-driven-development`.
 
 ## Installation
 
-See the [ronin-skills marketplace README](https://github.com/fubits1/ronin-skills) for installation and setup instructions.
+```
+/plugin install agent --marketplace fubits1/ronin-skills
+```
+
+On Claude Code v2.1.275 or later this adds the marketplace if needed. For the full setup, see the [ronin-skills marketplace README](https://github.com/fubits1/ronin-skills).

@@ -16,10 +16,6 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const BANNED = "grep|egrep|fgrep|rg|cat|head|tail|find|awk|wc|perl";
-const WRAP =
-  "((timeout|time|nice|nohup|stdbuf|env|exec|eval|builtin|xargs)\\s+(-\\S+\\s+|[0-9]+\\s+)*)?([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*";
-const PATHQ = "(\\\\?[A-Za-z0-9_./-]*/)?";
-const TAIL = "([^A-Za-z0-9_]|$)";
 const WRAPPERS = new Set([
   "timeout",
   "time",
@@ -32,45 +28,37 @@ const WRAPPERS = new Set([
   "builtin",
   "xargs",
 ]);
+const PATH_PREFIX = "(\\\\?[A-Za-z0-9_./-]*/)?";
+const WRAPPER_PREFIX = `(${PATH_PREFIX}(${[...WRAPPERS].join("|")})\\s+(-\\S+\\s+|[0-9]+\\s+)*){0,8}([A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*`;
+const WORD_END = "([^A-Za-z0-9_]|$)";
+const BANNED_CALL = `${WRAPPER_PREFIX}${PATH_PREFIX}(${BANNED})${WORD_END}`;
+// `-[a-z]*c[a-z]*` matches the -c flag alone or fused in a short cluster (-lc/-ic/-cl/-xc), since the
+// model writes those plainly; it is not chasing evasion. Still requires a literal `c` flag.
+const BASHC = "(^|\\s)(bash|sh|zsh|dash)\\s+-[a-z]*c[a-z]*\\s+[\"']";
+const ASSIGNMENT = /^\s*[A-Za-z_][A-Za-z0-9_]*=\S*\s*/;
+const RE_SED_N = /sed\s+(\S+\s+)*-n(\s|$)/;
+const RE_SED_NP =
+  /sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
 
 // Pre-extraction scans: a banned tool the segment splitter can't see (wrapped in bash -c, $(...),
 // backticks, <(...), or a node/python -e shell-out).
 const RE_NODE_SHELLOUT =
   /(^|\s)(node|deno|bun)\s+(-e|--eval)\s+["'].*(child[_]process|exec[S]ync|spawn[S]ync)/;
 const RE_PY_SHELLOUT = /(^|\s)(python|python3)\s+(-c)\s+["'].*subprocess/;
-// `-[a-z]*c[a-z]*` matches the -c flag alone or fused in a short cluster (-lc/-ic/-cl/-xc), since the
-// model writes those plainly; it is not chasing evasion. Still requires a literal `c` flag.
-const RE_BASHC_BANNED = new RegExp(
-  "(^|\\s)(bash|sh|zsh|dash)\\s+-[a-z]*c[a-z]*\\s+[\"']\\s*" +
-    WRAP +
-    PATHQ +
-    "(" +
-    BANNED +
-    ")" +
-    TAIL,
-);
-const RE_BASHC_SED_N =
-  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+)*-n(\s|$)/;
-const RE_BASHC_SED_NP =
-  /(^|\s)(bash|sh|zsh|dash)\s+-[a-z]*c[a-z]*\s+["'][^"']*sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
-const RE_DOLLAR_SUB = new RegExp(
-  "\\$\\(\\s*" + WRAP + PATHQ + "(" + BANNED + ")" + TAIL,
-);
-const RE_BACKTICK_SUB = new RegExp(
-  "`\\s*" + WRAP + PATHQ + "(" + BANNED + ")" + TAIL,
-);
-const RE_PROCSUB = new RegExp(
-  "[<>]\\(\\s*" + WRAP + PATHQ + "(" + BANNED + ")" + TAIL,
-);
+const RE_BASHC_BANNED = new RegExp(BASHC + "\\s*" + BANNED_CALL);
+const RE_BASHC_SED_N = new RegExp(BASHC + "[^\"']*" + RE_SED_N.source);
+const RE_BASHC_SED_NP = new RegExp(BASHC + "[^\"']*" + RE_SED_NP.source);
+const RE_DOLLAR_SUB = new RegExp("\\$\\(\\s*" + BANNED_CALL);
+const RE_BACKTICK_SUB = new RegExp("`\\s*" + BANNED_CALL);
+const RE_PROCSUB = new RegExp("[<>]\\(\\s*" + BANNED_CALL);
 
+const SHELL_WORD = String.raw`(?:"(?:\\.|[^"\\])*"|'[^']*'|\\.|[^\s"'\\])+`;
 // git global options that can precede the subcommand (`git -C <path> commit`, `git -c k=v commit`,
 // `git --no-pager log`). Stripped so the subcommand is read correctly — otherwise a global option
 // lets a real mutation slip past (`git -C /repo commit` was allowed).
-const GIT_GLOBAL =
-  /^(-C\s+\S+|-c\s+\S+|--git-dir(=\S+|\s+\S+)|--work-tree(=\S+|\s+\S+)|--namespace(=\S+|\s+\S+)|--exec-path(=\S+)?|--no-pager|--paginate|-p|--bare|--no-replace-objects|--(no-)?literal-pathspecs|--glob-pathspecs|--icase-pathspecs)\s+/;
-const RE_SED_N = /sed\s+(\S+\s+)*-n(\s|$)/;
-const RE_SED_NP =
-  /sed\s+(\S+\s+)*(-e\s+|--expression[\s=])?["']?(\$|[0-9]+)(,(\$|[0-9]+))?p["']?(\s|$)/;
+const GIT_GLOBAL = new RegExp(
+  String.raw`^((?:-[Cc]\s+|--(?:git-dir|work-tree|namespace)(?:=|\s+))${SHELL_WORD}|--exec-path(?:=${SHELL_WORD})?|--no-pager|--paginate|-p|--bare|--no-replace-objects|--(?:no-)?literal-pathspecs|--glob-pathspecs|--icase-pathspecs)\s+`,
+);
 
 // Shared note for search/read messages. The Grep/Glob tools were removed on native macOS/Linux
 // builds in 2.1.117 (Windows/npm keep them), so the dedicated alternative is fff there; Read works
@@ -80,13 +68,13 @@ const SEARCH_FALLBACK =
 /**
  * NO_BASH_SEARCH_FALLBACK hint
  *
- * worded for the setting both on and off: git grep / perl stay blocked while it is on, so the hint
- * names plain grep/find instead of asking the user to set a variable that is already set
+ * Worded for the setting both on and off: git grep / perl stay blocked while it is on, so the hint
+ * names plain grep/find instead of asking the user to set a variable that is already set.
  */
 const BASH_SEARCH_FALLBACK_HINT =
   "If neither is available in this session, Bash search is the one fallback: with NO_BASH_SEARCH_FALLBACK=1 set (settings.json env), plain grep/find pass through to the embedded ugrep/bfs; if it is not set, ask the user to set it. Do not work around the block any other way.";
 
-const MSG = {
+const MESSAGES = {
   "node-shellout": `Use the dedicated tool (${SEARCH_FALLBACK}) instead of shelling out to a subprocess API from inside an embedded JS script.`,
   "python-shellout": `Use the dedicated tool (${SEARCH_FALLBACK}) instead of shelling out to subprocess from inside an embedded Python script.`,
   "bashc-banned": `A banned file-read/search tool (or sed-read) was invoked via 'bash -c' / 'sh -c'. Run it directly at the top level instead of wrapping it in a shell, so the hook can name the right tool (${SEARCH_FALLBACK}).`,
@@ -113,58 +101,58 @@ const MSG = {
     "No command chaining. You joined multiple commands with && / || / ; in one Bash call. Run each as a SEPARATE Bash call instead. Chaining hides later commands from per-command approval and is a documented permission-bypass vector. (The working directory persists across Bash calls, so 'cd dir && cmd' is unnecessary too. Pipes into jq and redirections like 2>&1 are fine.)",
 };
 function block(tag, message) {
-  return { tag, msg: message || MSG[tag] };
+  return { tag, msg: message || MESSAGES[tag] };
 }
-function grepMessage(tool) {
+function buildGrepMessage(tool) {
   return `Use the Grep tool instead of Bash ${tool}. Grep supports: multiline: true, output_mode (content/files_with_matches/count), -A/-B/-C context, -i case-insensitive, glob/type filtering, head_limit, offset. On native macOS/Linux builds the Grep tool was removed in 2.1.117; use the fff MCP (mcp__fff__grep) instead, which returns structured, frecency-ranked results. ${BASH_SEARCH_FALLBACK_HINT}`;
 }
-function readMessage(tool) {
+function buildReadMessage(tool) {
   return `Use the Read tool instead of Bash ${tool}. Read supports: offset (start line), limit (number of lines).`;
 }
 
 function firstToken(text) {
-  const m = text.replace(/^\s+/, "").match(/^\S+/);
-  return m ? m[0] : "";
+  return text.match(/\S+/)?.[0] ?? "";
 }
-function stripBackslashAndPath(w) {
-  let f = w.replace(/^\\/, ""); // strip ONE leading backslash (\grep -> grep)
-  if (f.includes("/")) f = f.split("/").pop(); // basename
-  return f;
+function stripBackslashAndPath(word) {
+  let name = word.replace(/^\\/, ""); // strip ONE leading backslash (\grep -> grep)
+  if (name.includes("/")) name = name.split("/").pop(); // basename
+  return name;
 }
 function normalizeFirst(commandIn) {
   let command = commandIn.replace(/^\s+/, ""); // ltrim
   while (command[0] === "(" || command[0] === "{") {
     command = command.slice(1).replace(/^\s+/, ""); // strip leading group-openers
   }
-  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(command)) {
-    command = command.replace(/^[A-Za-z_][A-Za-z0-9_]*=\S*\s*/, ""); // strip VAR=value prefixes
+  while (ASSIGNMENT.test(command)) {
+    command = command.replace(ASSIGNMENT, ""); // strip VAR=value prefixes
   }
   let first = stripBackslashAndPath(firstToken(command));
   // Unwrap process wrappers (timeout 5 nice -n 10 grep). Cap 8; on overflow, fall through (a bare
-  // wrapper or pathological stacking is not the model's reflex this hook targets).
+  // wrapper or pathological stacking is not the model's reflex this hook targets). Strip the whole
+  // first token, not its basename, so /usr/bin/env and \timeout unwrap too.
   let i = 0;
   while (i < 8 && WRAPPERS.has(first)) {
-    let rest = command.replace(new RegExp("^\\s*" + first + "(\\s+|$)"), "");
+    let rest = command.replace(/^\s*\S+(\s+|$)/, "");
     // strip wrapper flags / numerics, plus the `{}` replstr of `xargs -I {}` (the dominant xargs
     // idiom — `-I` is consumed as a flag, then `{}` would otherwise become the effective first token)
     while (/^\s*(-|[0-9]|\{\})/.test(rest)) {
       rest = rest.replace(/^\s*\S+\s*/, "");
     }
-    while (/^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(rest)) {
-      rest = rest.replace(/^\s*[A-Za-z_][A-Za-z0-9_]*=\S*\s*/, "");
+    while (ASSIGNMENT.test(rest)) {
+      rest = rest.replace(ASSIGNMENT, "");
     }
     command = rest;
     first = stripBackslashAndPath(firstToken(rest));
     i++;
   }
-  return first;
+  return { first, command: command.replace(/^\s*\S+/, first) };
 }
 
 // Count top-level commands, quote/heredoc/continuation aware, so only a real `&&` / `||` / `;` /
 // bare-newline BETWEEN commands counts as chaining. A newline inside a quoted argument (multi-line
 // `--body`/`-m`), a `\`-newline continuation, or a heredoc body is ONE command, not a chain — the old
 // per-line strip split on `\n` first and miscounted all three.
-function chainCount(command) {
+function countCommands(command) {
   // Heredoc bodies (`cmd <<EOF … EOF`) are stdin, not separate commands — blank them so their inner
   // newlines don't count as chaining. The lazy `[\s\S]*?` scan is bounded two ways so it stays
   // LINEAR: it runs only on multi-line input, and only when there are FEW heredoc openers. A real
@@ -182,9 +170,11 @@ function chainCount(command) {
   let quoteChar = null;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
+    // An escaped char is inert (e.g. \" never toggles a quote) — but bash does NOT process
+    // backslash inside single quotes, so don't treat it as an escape there.
     if (char === "\\" && quoteChar !== "'") {
-      i++; // an escaped char is inert (e.g. \" never toggles a quote) — but bash does NOT process
-      continue; // backslash inside single quotes, so don't treat it as an escape there
+      i++;
+      continue;
     }
     if (quoteChar) {
       if (char === quoteChar) quoteChar = null; // inside a quote: drop everything (incl. ; && and newlines)
@@ -196,26 +186,24 @@ function chainCount(command) {
     }
     output += char;
   }
-  const segments = output.replace(/(&&|\|\||;)/g, "\n").split("\n");
-  let count = 0;
-  for (const segment of segments) {
-    if (segment.replace(/\s/g, "") !== "") count++;
+  return output.split(/&&|\|\||;|\n/).filter((part) => part.trim()).length;
+}
+
+function stripGitGlobals(segment) {
+  let rest = segment.replace(/^[^A-Za-z]*git\s+/, ""); // drop leading `git ` (and any indent/operator)
+  while (GIT_GLOBAL.test(rest)) {
+    rest = rest.replace(GIT_GLOBAL, ""); // strip global options before the subcommand
   }
-  return count;
+  return rest;
 }
 
 // Is this `git …` segment a MUTATION (block) or a read-only/inspection form (pass)? The hook's
 // contract (no-bash.md): mutating git blocks while read-only git and `git mv` pass. Every subcommand
 // with a common read-only form is discriminated — mirroring how `remote` already was — so reads like
 // `git stash list`, `git tag -l`, `git config --get`, `git clean -n`, `git apply --check` pass.
-function gitMutates(segment) {
-  let rest = segment.replace(/^[^A-Za-z]*git\s+/, ""); // drop leading `git ` (and any indent/operator)
-  let prev;
-  do {
-    prev = rest;
-    rest = rest.replace(GIT_GLOBAL, ""); // strip global options before the subcommand
-  } while (rest !== prev);
-  const subcommand = (rest.match(/^\S+/) || [""])[0];
+function isGitMutation(segment) {
+  const rest = stripGitGlobals(segment);
+  const subcommand = rest.match(/^\S+/)?.[0] ?? "";
   const args = rest.slice(subcommand.length); // leading-space-prefixed remainder after the subcommand
   switch (subcommand) {
     // unconditional mutations (no common read-only form)
@@ -281,7 +269,7 @@ function splitSegments(text) {
     const char = text[i];
     if (char === "\\" && quoteChar !== "'") {
       // an escaped char is literal, never structural: keep both, so `\"` doesn't toggle a quote and
-      // `\;`/`\&`/`\|` don't split a segment (mirrors chainCount). Bash does NOT process backslash
+      // `\;`/`\&`/`\|` don't split a segment (mirrors countCommands). Bash does NOT process backslash
       // inside single quotes, so don't treat it as an escape there (else a `'…\'` keeps the quote open).
       current += char;
       if (i + 1 < text.length) current += text[++i];
@@ -311,17 +299,17 @@ function splitSegments(text) {
 }
 
 /**
- * bashSearchAllowed lets grep/find through (NO_BASH_SEARCH_FALLBACK=1, read in main())
+ * bashSearchAllowed lets grep/find through (NO_BASH_SEARCH_FALLBACK=1, read in main()).
  *
- * the one case where blocking search leaves no allowed way to search: a native macOS/Linux build
- * (2.1.117 removed the Grep/Glob tools) with the fff MCP unavailable. there, Bash `grep`/`rg`/`find`
+ * The one case where blocking search leaves no allowed way to search: a native macOS/Linux build
+ * (2.1.117 removed the Grep/Glob tools) with the fff MCP unavailable. There, Bash `grep`/`rg`/`find`
  * are Claude Code's embedded search (the shell snapshot replaces the names, see no-bash.md), so
- * they are the only search left. the hook cannot detect fff on its own (stdin carries no tool
+ * they are the only search left. The hook cannot detect fff on its own (stdin carries no tool
  * list, and there is no tool-availability API), so the user switches it on in settings.json `env`.
- * reads stay blocked either way: `Read` is present on every build
+ * Reads stay blocked either way: `Read` is present on every build.
  */
 export function scan(command, bashSearchAllowed = false) {
-  if (typeof command !== "string" || command === "") return null;
+  if (typeof command !== "string" || command === "") return null; // empty/absent/non-string: fail open
 
   if (RE_NODE_SHELLOUT.test(command)) return block("node-shellout");
   if (RE_PY_SHELLOUT.test(command)) return block("python-shellout");
@@ -333,64 +321,57 @@ export function scan(command, bashSearchAllowed = false) {
   if (RE_BACKTICK_SUB.test(command)) return block("backtick-sub");
   if (RE_PROCSUB.test(command)) return block("procsub");
 
-  for (const SUB of splitSegments(command)) {
-    if (SUB.replace(/ /g, "") === "") continue;
-    const FIRST = normalizeFirst(SUB);
-    if (FIRST === "ls") continue;
-    if (FIRST === "command") {
-      if (/^\s*command\s+-[vV]\b/.test(SUB)) continue; // existence check, not tool execution
+  for (const part of splitSegments(command)) {
+    const { first: firstWord, command: normalized } = normalizeFirst(part);
+    if (firstWord === "command") {
+      if (/^\s*command\s+-[vV]\b/.test(part)) continue; // existence check, not tool execution
       return block("command-builtin");
     }
-    if (FIRST === "git") {
-      if (/^\s*git\s+grep\b/.test(SUB)) {
-        return block("bash-grep", grepMessage("git grep")); // content search → Grep
+    if (firstWord === "git") {
+      if (/^grep\b/.test(stripGitGlobals(normalized))) {
+        return block("bash-grep", buildGrepMessage("git grep")); // content search → Grep
       }
-      if (gitMutates(SUB)) return block("git-mutation");
+      if (isGitMutation(normalized)) return block("git-mutation");
       continue;
     }
-    if (
-      FIRST === "grep" ||
-      FIRST === "egrep" ||
-      FIRST === "fgrep" ||
-      FIRST === "rg"
-    ) {
+    if (["grep", "egrep", "fgrep", "rg"].includes(firstWord)) {
       if (bashSearchAllowed) continue;
-      return block("bash-" + FIRST, grepMessage(FIRST));
+      return block("bash-" + firstWord, buildGrepMessage(firstWord));
     }
-    if (FIRST === "cat") {
+    if (firstWord === "cat") {
       // route to Write only for a genuine stdout file-write or heredoc; a stderr redirect
       // (`2>/dev/null`, `2>&1`, `1>&2`) or a here-string (`<<<`) is still a READ → cat-read
-      const heredoc = /(?<!<)<<(?!<)/.test(SUB); // exactly two `<` (heredoc), not `<<<` (here-string)
-      const stdoutWrite = /(^|[^0-9&<])1?>>?\s*[^&\s]/.test(SUB);
+      const heredoc = /(?<!<)<<(?!<)/.test(part); // exactly two `<` (heredoc), not `<<<` (here-string)
+      const stdoutWrite = /(^|[^0-9&<])1?>>?\s*[^&\s]/.test(part);
       return heredoc || stdoutWrite ? block("cat-write") : block("cat-read");
     }
-    if (FIRST === "head" || FIRST === "tail") {
-      return block("bash-" + FIRST, readMessage(FIRST));
+    if (firstWord === "head" || firstWord === "tail") {
+      return block("bash-" + firstWord, buildReadMessage(firstWord));
     }
-    if (FIRST === "find") {
+    if (firstWord === "find") {
       if (bashSearchAllowed) continue;
       return block("bash-find");
     }
-    if (FIRST === "sed") {
-      if (RE_SED_N.test(SUB) || RE_SED_NP.test(SUB)) return block("sed-read");
+    if (firstWord === "sed") {
+      if (RE_SED_N.test(part) || RE_SED_NP.test(part)) return block("sed-read");
       continue;
     }
     // `perl` is banned outright, unlike `sed`: a one-liner is a grep/cat substitute the model
     // reaches for once the named readers block, and no workflow here needs it — `sed -i 's///'`
     // covers in-place editing. Enumerating interpreters cannot close the class (claude-code#40408);
     // this closes the one the agent actually reaches for.
-    if (FIRST === "perl") {
+    if (firstWord === "perl") {
       return block(
         "bash-perl",
-        `${grepMessage("perl")} For in-place edits use the Edit tool, or sed -i 's///' (GNU) / sed -i '' 's///' (macOS).`,
+        `${buildGrepMessage("perl")} For in-place edits use the Edit tool, or sed -i 's///' (GNU) / sed -i '' 's///' (macOS).`,
       );
     }
-    if (FIRST === "awk") return block("bash-awk");
-    if (FIRST === "wc") return block("bash-wc");
+    if (firstWord === "awk") return block("bash-awk");
+    if (firstWord === "wc") return block("bash-wc");
   }
 
   // No-chaining check (runs after the per-tool arms, so a banned-tool message wins).
-  if (chainCount(command) > 1) return block("chaining");
+  if (countCommands(command) > 1) return block("chaining");
   return null;
 }
 
@@ -408,7 +389,6 @@ function main() {
     return; // unparseable stdin: fail open
   }
   const command = input?.tool_input?.command;
-  if (typeof command !== "string" || command === "") return; // empty/absent/non-string: fail open
   // the hook's own env, not the command: a `NO_BASH_SEARCH_FALLBACK=1 grep …` prefix does not count
   const hit = scan(command, process.env.NO_BASH_SEARCH_FALLBACK === "1");
   if (hit) {

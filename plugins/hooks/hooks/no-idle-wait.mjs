@@ -19,18 +19,18 @@ function main() {
   const tasks = Array.isArray(input?.background_tasks)
     ? input.background_tasks
     : [];
-  const running = tasks
+  const runningSummary = tasks
     .filter((task) => task?.status === "running")
     .map((task) => `${task.type}: ${task.description}`)
     .join("; ");
-  if (!running) {
+  if (!runningSummary) {
     return;
   }
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "Stop",
-        additionalContext: `Background work is still running (${running}). Before ending the turn, take the next independent task of the plan (files it does not touch, read-only checks, records). End the turn only if none is left, and say so in one line.`,
+        additionalContext: `Background work is still running (${runningSummary}). Before ending the turn, take the next independent task of the plan (files it does not touch, read-only checks, records). End the turn only if none is left, and say so in one line.`,
       },
     }),
   );

@@ -105,7 +105,7 @@ function main() {
   }
 }
 
-// Run only when executed directly; tests import checkTempDir. realpath both sides so a symlinked
+// Run only when executed directly; tests import checkTempDir. Realpath both sides so a symlinked
 // install path still matches.
 let runAsHook = true;
 try {
@@ -113,7 +113,7 @@ try {
     realpathSync(process.argv[1]) ===
     realpathSync(fileURLToPath(import.meta.url));
 } catch {
-  runAsHook = true;
+  // realpath failed: keep the default and run
 }
 if (runAsHook) {
   try {

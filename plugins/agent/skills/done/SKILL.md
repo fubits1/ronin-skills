@@ -33,7 +33,7 @@ Complete every gate below, in order, before declaring done. Skipping a gate is h
 
 ## 3. Re-run flaky suites
 
-- Flaky suites (browser/e2e/MSW) vary between runs. Prefer project cleanup scripts (e.g. `pnpm run test:kill-ports`); otherwise free the test-server port: `lsof -ti :<port>`, then confirm it's the test server (`ps -p <pid> -o comm=`), then `kill <pid>` (SIGTERM), using `kill -9` only if it stays bound after a short wait. Clear stale caches (e.g. `rm -rf node_modules/.vite node_modules/.cache/storybook`), then run the affected command 3x consecutively.
+- Flaky suites (browser/e2e/MSW) vary between runs. Prefer project cleanup scripts (e.g. `pnpm run test:kill-ports`); otherwise free the test-server port: `lsof -ti :<port>`, then confirm it's the test server (`ps -p <pid> -o comm=`), then, if you did not start it, ask before `kill <pid>` (`agent:dev-server`) (SIGTERM), using `kill -9` only if it stays bound after a short wait. Clear stale caches (e.g. `rm -rf node_modules/.vite node_modules/.cache/storybook`), then run the affected command 3x consecutively.
 - Test counts must match exactly (±0) and setup time within ~±30%; any divergence is NOT done. Investigate the flake.
 - A green run is evidence only for the exact machine and connection it ran on. If the user's run is red while yours is green, theirs wins. Get their log and conditions and reproduce their failure before claiming anything.
 

@@ -20,7 +20,7 @@ Part of the [ronin-skills](https://github.com/fubits1/ronin-skills) marketplace.
 
 | Hook | Trigger | What it does |
 | --- | --- | --- |
-| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`cat`/`find`/`head`/`tail`/`awk`/`wc`/`rg`) and their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included). Rationale + sources: [hooks/no-bash.md](hooks/no-bash.md). |
+| `no-bash.mjs` | PreToolUse (Bash) | Hard-blocks Bash file-read/search tools (`grep`/`egrep`/`fgrep`/`rg`/`cat`/`head`/`tail`/`find`/`awk`/`wc`/`perl`, `sed -n` reads), `cat > file` heredocs, and mutating git, plus their shell-out bypass vectors, checking each segment of compound commands so nothing rides along. Also blocks gratuitous command chaining (`&&`/`\|\|`/`;`), forcing one command per call. Routes the agent to dedicated tools (fff MCP, Grep / Read / Glob / Write, jq). Zero-dependency cross-OS Node (Windows included). Rationale + sources: [hooks/no-bash.md](hooks/no-bash.md). |
 | `force-plan-mode.mjs` | UserPromptSubmit | Detects `/plan`, "make a plan", etc. and injects a directive forcing `EnterPlanMode` as the next tool call. |
 | `no-absolute-paths.mjs` | PreToolUse (Bash) | Blocks Bash calls that prepend the project-root absolute path (or `~`-form / `$HOME`-form) to commands. Keeps `permissions.allow` clean. |
 | `fix-formatting.mjs` | PostToolUse (Write\|Edit) | Auto-formats edited files via Prettier (non-Markdown) or markdownlint (`.md`). Silent on success. |
@@ -34,15 +34,15 @@ start of every session.
 ## Requires the `agent` plugin
 
 These hooks reference `agent` skills: the SessionStart directive invokes `agent:discipline`,
-`force-plan-mode.mjs` drives the `agent:plan` flow, and `no-bash.mjs`'s block messages point at
-the `agent:no-bash` skill. Install `agent` first. Without it the hooks still block correctly,
+`force-plan-mode.mjs` drives the `agent:plan` flow, and `no-honest.mjs`'s nudge points at
+`agent:discipline`. Install `agent` first. Without it the hooks still block correctly,
 but the directives reference skills you won't have.
 
 ## Installation
 
 ```
-/plugin install agent
-/plugin install hooks
+/plugin install agent --marketplace fubits1/ronin-skills
+/plugin install hooks --marketplace fubits1/ronin-skills
 /reload-plugins
 ```
 
@@ -55,6 +55,7 @@ node plugins/hooks/hooks/tests/mock-install-no-bash.mjs # CI: no-bash.mjs instal
 node plugins/hooks/hooks/tests/validate-no-bash.mjs     # CI: shlex-oracle differential + seeded fuzz (needs python3)
 node plugins/hooks/hooks/tests/bench-no-bash.mjs        # CI: perf / no-ReDoS gate
 node plugins/hooks/hooks/tests/replay-transcript-no-bash.mjs <dir>  # ad-hoc: replay real session commands for false positives
-node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start / no-idle-wait / no-tmp
+node plugins/hooks/hooks/tests/run-hook-tests.mjs       # CI: force-plan-mode / no-absolute-paths / fix-formatting / session-start / no-idle-wait / no-honest core / no-tmp
+node plugins/hooks/hooks/tests/conformance-hooks.mjs    # CI: fail-open + protocol contract, all hooks
 node plugins/hooks/hooks/tests/run-no-honest-tests.mjs  # CI: the no-honest Stop hook
 ```

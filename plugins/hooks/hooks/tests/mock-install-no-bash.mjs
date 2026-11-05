@@ -24,9 +24,9 @@ const SRC = join(HERE, ".."); // plugins/hooks/hooks
 const hooksJson = JSON.parse(readFileSync(join(SRC, "hooks.json"), "utf8"));
 let template = null;
 for (const entry of hooksJson.hooks.PreToolUse || []) {
-  for (const result of entry.hooks || []) {
-    if (result.command && result.command.includes("no-bash")) {
-      template = result.command;
+  for (const hook of entry.hooks || []) {
+    if (hook.command && hook.command.includes("no-bash")) {
+      template = hook.command;
     }
   }
 }
@@ -59,9 +59,9 @@ try {
   }
 
   /**
-   * substitute ${CLAUDE_PLUGIN_ROOT} → the spaced root and run it through bash (the documented
-   * default hook shell), exactly as Claude Code does. only a real shell splits an unquoted root,
-   * and the resulting exit 1 is a non-blocking hook error, so the hook goes silent
+   * Substitute ${CLAUDE_PLUGIN_ROOT} → the spaced root and run it through bash (the documented
+   * default hook shell), exactly as Claude Code does. Only a real shell splits an unquoted root,
+   * and the resulting exit 1 is a non-blocking hook error, so the hook goes silent.
    */
   const command = template.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root);
 
