@@ -1,7 +1,6 @@
 ---
 name: socket
 description: Socket.dev security scanning — check packages before installing, scan repos for supply chain risks. Auto-invoke when evaluating package safety, checking dependencies, or before installing new packages.
-user-invocable: true
 argument-hint: <npm/package-name | scan>
 ---
 

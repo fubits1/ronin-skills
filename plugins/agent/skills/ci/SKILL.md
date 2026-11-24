@@ -1,7 +1,6 @@
 ---
 name: ci
 description: CI/CD workflow rules — GitHub Actions patterns, validation, Playwright in CI. Auto-invoke when editing .github/workflows files or discussing CI pipelines.
-user-invocable: true
 ---
 
 # CI

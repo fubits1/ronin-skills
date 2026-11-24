@@ -1,7 +1,6 @@
 ---
 name: tea
 description: '"Coffee or tea? YES." Invoke when Claude asks an "X or Y?" question, presents multiple options, or overwhelms with choices instead of just doing the work.'
-user-invocable: true
 ---
 
 # /tea — "Coffee or tea? YES."

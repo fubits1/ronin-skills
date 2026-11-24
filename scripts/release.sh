@@ -62,15 +62,11 @@ done
 
 echo "release.sh: validating marketplace + plugins"
 # the full report (Provides, Hosts, directory notes) is informational on a pass;
-# print it only when validation fails or passes with warnings
+# print it only on failure (--strict fails on warnings too)
 validate() {
   local report
-  report="$(claude plugin validate "$1" 2>&1)" || { printf '%s\n' "$report" >&2; die "validation failed for $1"; }
-  if [[ "$report" == *"passed with warnings"* ]]; then
-    printf '%s\n' "$report"
-  else
-    echo "release.sh: validated $1"
-  fi
+  report="$(claude plugin validate --strict "$1" 2>&1)" || { printf '%s\n' "$report" >&2; die "validation failed for $1"; }
+  echo "release.sh: validated $1"
 }
 validate .
 for plugin_dir in plugins/*/; do

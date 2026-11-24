@@ -1,7 +1,6 @@
 ---
 name: pnpm
 description: Package manager rules — always pnpm, never npm/npx, socket checks before installing. Auto-invoke when installing packages or running project tools.
-user-invocable: true
 ---
 
 # pnpm

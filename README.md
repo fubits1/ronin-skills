@@ -58,6 +58,16 @@ Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-
 /plugin install hooks
 ```
 
+### Other agents (Codex, Cursor, and more)
+
+The skills are [Agent Skills](https://agentskills.io) (`SKILL.md` folders), so the [`skills`](https://github.com/vercel-labs/skills) CLI installs them into any supported agent:
+
+```sh
+npx skills add fubits1/ronin-skills
+```
+
+This installs the skills only. The hooks are Claude Code plugins and need the marketplace install above. The skills refer to each other by their plugin names (`agent:before-you-act`), which other agents have to resolve to the bare skill names.
+
 ## Updating
 
 To get the latest version:

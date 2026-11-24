@@ -1,7 +1,6 @@
 ---
 name: obey
 description: Use when the user gives a specific command to run and you are about to modify, decompose, interpret, or substitute it with something else. Auto-invoke when running shell commands, pnpm scripts, or any CLI instruction the user explicitly stated.
-user-invocable: true
 ---
 
 # Obey

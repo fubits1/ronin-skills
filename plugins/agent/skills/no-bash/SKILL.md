@@ -1,7 +1,6 @@
 ---
 name: no-bash
 description: "Use fff MCP / Grep / Read / Glob — never Bash grep/cat/find/head/tail/sed/awk/rg/wc — for file search and read. Use jq for JSON parsing/shaping (not node -e / python -c). A hook hard-blocks the banned Bash calls, and the dedicated tools return clean, cacheable, line-numbered results. Auto-invoke when searching, reading, or counting in files."
-user-invocable: true
 ---
 
 # Use Dedicated Tools, Not Bash

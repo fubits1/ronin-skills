@@ -4,7 +4,6 @@ description: >-
   Research discipline: how to investigate before acting,
   verify claims. Auto-invoke when researching, answering
   questions, or planning migrations.
-user-invocable: true
 ---
 
 # Research
