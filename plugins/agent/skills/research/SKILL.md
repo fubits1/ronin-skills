@@ -27,8 +27,8 @@ migration, an architectural question, "suggest better
 approaches", or "ARE YOU SURE?" gets the full four-channel
 sweep.) Minimum bar before presenting any non-trivial
 finding: at least one local read/grep AND one
-WebSearch/WebFetch; if you haven't used both, you haven't
-researched, go back and do it.
+WebSearch or page fetch (channel 2); if you haven't used
+both, you haven't researched, go back and do it.
 
 ### 1. Local investigation
 
@@ -41,8 +41,10 @@ already be in the project.
 
 Use available MCP servers (Svelte, Storybook, knip, etc.).
 Fetch `llms.txt` for libraries. Read official
-documentation via WebFetch. The authoritative source beats
-a blog post.
+documentation with a page fetch: the WebFetch tool, or,
+when your tool list has no WebFetch, the Agent tool with
+`subagent_type: "web-fetch"`. The authoritative source
+beats a blog post.
 
 ### 3. Online research
 
@@ -100,8 +102,8 @@ from memory and misses that the problem is a known tracked bug
 with a community fix far better than the vibe answer.
 
 If you catch yourself about to write an answer without having
-used WebSearch or WebFetch, STOP. You are doing the thing. Go
-search.
+used WebSearch or a page fetch, STOP. You are doing the thing.
+Go search.
 
 ## Specific Rules
 
@@ -149,7 +151,7 @@ If the answer is "guess", STOP. Do one of:
 
 1. Say "I don't know": this is always acceptable
 2. Run the tool/command to check: this takes seconds
-3. Use WebSearch/WebFetch to look it up: this takes seconds
+3. Use WebSearch or a page fetch to look it up: this takes seconds
 
 **Red flags that you're about to bullshit:**
 
