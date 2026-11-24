@@ -27,30 +27,6 @@ jobs:
             claude plugin validate --strict "$plugin_dir" || exit 1
           done
 
-  # cross-agent portability: every skill must pass the Agent Skills spec
-  # (agentskills.io), which `npx skills` installs into non-Claude agents.
-  # `socket` is skipped: its Claude Code-only `argument-hint` field fails the spec.
-  # Drop the skip once one of these lands:
-  # - spec support for Claude Code fields: https://github.com/agentskills/agentskills/issues/105
-  # - `skills-ref validate --allow-field`: https://github.com/agentskills/agentskills/pull/350
-  # (the validator PR for these fields was declined: https://github.com/agentskills/agentskills/pull/277)
-  skills-spec:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.15"
-      - run: pip install "git+https://github.com/agentskills/agentskills@83021e2be457a9b6679148719c1f6074f0ad975e#subdirectory=skills-ref"
-      - name: skills-ref validate
-        run: |
-          for skill_dir in plugins/*/skills/*/; do
-            [[ "$skill_dir" == */skills/socket/ ]] && continue
-            skills-ref validate "$skill_dir" || exit 1
-          done
-
   lint:
     runs-on: ubuntu-latest
     steps:

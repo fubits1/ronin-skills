@@ -60,7 +60,7 @@ Optional — the enforcement hooks (Bash-tool blocking, plan-mode forcing, auto-
 
 ### Other agents (Codex, Cursor, and more)
 
-The skills follow the [Agent Skills](https://agentskills.io) spec, so the [`skills`](https://github.com/vercel-labs/skills) CLI installs them into any supported agent:
+The skills are [Agent Skills](https://agentskills.io) (`SKILL.md` folders), so the [`skills`](https://github.com/vercel-labs/skills) CLI installs them into any supported agent:
 
 ```sh
 npx skills add fubits1/ronin-skills
