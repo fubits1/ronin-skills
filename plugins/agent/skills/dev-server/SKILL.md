@@ -1,7 +1,6 @@
 ---
 name: dev-server
 description: Dev server and background process management — when to start, mandatory cleanup, port safety. Auto-invoke when pnpm dev or any background process is involved.
-user-invocable: true
 ---
 
 # Dev Server

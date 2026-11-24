@@ -1,7 +1,6 @@
 ---
 name: do-your-job
 description: Use when the user corrects you, hands you a diagnosis, or gives a directive to decide, conclude, or carry out a stated action ("it just needs X", "decide whether Y", "update the docs"); also when your own fix keeps failing on the same theory.
-user-invocable: true
 ---
 
 # Do Your Job

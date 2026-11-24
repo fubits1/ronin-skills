@@ -5,6 +5,7 @@
     "name": "fubits1"
   },
   "icon": "./.claude-plugin/icon.png",
+  "dependencies": ["agent"],
   "network": {
     "hosts": ["registry.npmjs.org"]
   },

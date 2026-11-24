@@ -1,7 +1,6 @@
 ---
 name: asshole
 description: Ensures failures in test, build, or command output are never dismissed as "pre-existing", "unrelated", or "not my problem" — they get acknowledged with an offer to fix. Auto-invoke when reporting test results, build output, CI logs, or any command output containing errors or failures.
-user-invocable: true
 ---
 
 # Asshole

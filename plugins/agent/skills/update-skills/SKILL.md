@@ -1,7 +1,6 @@
 ---
 name: update-skills
 description: Reconcile skill collections, backport from ~/.claude/skills into a marketplace plugins tree, scrubbing proprietary refs. Use when local has diverged from upstream, or when promoting local-only skills to a marketplace.
-user-invocable: true
 ---
 
 # Update Skills

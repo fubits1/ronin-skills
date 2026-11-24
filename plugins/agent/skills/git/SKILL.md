@@ -1,7 +1,6 @@
 ---
 name: git
 description: Git rules — safe operations, preventing destructive commands on user's working tree. Auto-invoke whenever using git commands.
-user-invocable: true
 ---
 
 # Git

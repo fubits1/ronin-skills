@@ -1,7 +1,6 @@
 ---
 name: done
 description: Final checklist before declaring any task complete. Auto-invoke before saying "done", "ready", "complete", or asking to commit/push.
-user-invocable: true
 ---
 
 # Definition of Done
