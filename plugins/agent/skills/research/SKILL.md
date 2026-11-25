@@ -107,9 +107,9 @@ Go search.
 ## Specific Rules
 
 - Use `npmx.dev` for package info, not npmjs.com.
-- Verify packages with
-  `socket package score npm <pkg>@<ver> --markdown`
-  before use.
+- Verify packages before use:
+  - One package with its dependencies: `socket package score npm <pkg>@<ver> --markdown` (100 of 500 API units per hour).
+  - Several packages in one call, without their dependencies: `socket package shallow npm <pkg>@<ver> <pkg2>@<ver> --markdown` (100 units per call).
 - actionlint (npm): WASM library, no CLI.
   node-actionlint: has CLI. Use
   `pnpx node-actionlint` to validate GitHub Actions
